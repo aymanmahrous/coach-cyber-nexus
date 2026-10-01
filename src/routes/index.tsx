@@ -43,6 +43,9 @@ const T = {
     waDesc: "صندوق رسائل العملاء وردود مقترحة من كوتش براين. يتطلب ربط WhatsApp Business API على الرقم 058 821 9130.",
     vaultDesc: "رفع من الهاتف والكمبيوتر وربط Google Drive وPhotos وDropbox وCanva، واختيار محرك الذكاء (OpenAI / Gemini / Runway).",
     tryBrain: "جرّب كوتش براين الآن لصياغة المحتوى والردود",
+    kpiTitle: "المؤشرات", demo: "بيانات تجريبية", real: "بيانات فعلية", showDemo: "عرض بيانات تجريبية", hideDemo: "إخفاء التجريبي",
+    kContent: "المحتوى", kPosts: "المنشورات", kMsgs: "الرسائل", kContentSub: "مسودات بانتظار المراجعة", kPostsSub: "مجدولة / منشورة", kMsgsSub: "استفسارات غير مقروءة", empty: "لا بيانات بعد",
+    shortcuts: "اختصارات سريعة", scPost: "إنشاء منشور", scMsgs: "مراجعة الرسائل", scBrain: "فتح كوتش براين",
     evBrainOk: "كوتش براين أجاب على استفسار", evBrainErr: "خطأ من كوتش براين", evAsk: "سؤال جديد لكوتش براين", evLang: "تم تغيير اللغة",
   },
   en: {
@@ -65,6 +68,9 @@ const T = {
     waDesc: "Customer inbox with Coach Brain suggested replies. Requires WhatsApp Business API on 058 821 9130.",
     vaultDesc: "Upload from phone/computer, link Google Drive, Photos, Dropbox, Canva, and pick the AI engine (OpenAI / Gemini / Runway).",
     tryBrain: "Use Coach Brain now to draft content and replies",
+    kpiTitle: "Indicators", demo: "Demo data", real: "Live data", showDemo: "Show demo data", hideDemo: "Hide demo",
+    kContent: "Content", kPosts: "Posts", kMsgs: "Messages", kContentSub: "Drafts awaiting review", kPostsSub: "Scheduled / published", kMsgsSub: "Unread inquiries", empty: "No data yet",
+    shortcuts: "Quick actions", scPost: "Create post", scMsgs: "Review messages", scBrain: "Open Coach Brain",
     evBrainOk: "Coach Brain answered a query", evBrainErr: "Coach Brain error", evAsk: "New question to Coach Brain", evLang: "Language changed",
   },
 } as const;
@@ -129,9 +135,9 @@ function Cockpit() {
         </div>
       </header>
 
-      <nav className="glass flex gap-1 overflow-x-auto p-1.5">
+      <nav className="glass sticky top-2 z-10 flex gap-1 overflow-x-auto p-1.5">
         {TABS.map(({ id, icon: Icon }) => (
-          <button key={id} onClick={() => setTab(id)}
+          <button key={id} onClick={() => setTab(id)} aria-current={tab === id ? "page" : undefined}
             className={`flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm transition ${tab === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}>
             <Icon className="size-4" /> {t.tabs[id]}
           </button>
@@ -139,7 +145,7 @@ function Cockpit() {
       </nav>
 
       <main className="flex-1">
-        {tab === "cockpit" && <CockpitView t={t} notes={notes} clear={() => setNotes([])} goBrain={() => setTab("brain")} />}
+        {tab === "cockpit" && <CockpitView t={t} notes={notes} clear={() => setNotes([])} go={setTab} />}
         <div className={tab === "brain" ? "" : "hidden"}>
           <BrainView t={t} log={log} setBrainState={setBrainState} />
         </div>
@@ -168,10 +174,48 @@ function Numbers({ t }: { t: TT }) {
   );
 }
 
-function CockpitView({ t, notes, clear, goBrain }: { t: TT; notes: Note[]; clear: () => void; goBrain: () => void }) {
+function CockpitView({ t, notes, clear, go }: { t: TT; notes: Note[]; clear: () => void; go: (t: Tab) => void }) {
+  const goBrain = () => go("brain");
   const cols = ["Scheduled", "Claimed", "Published", "Needs Review"] as const;
+  const [demo, setDemo] = useState(false);
+  const kpis = [
+    { label: t.kContent, sub: t.kContentSub, v: demo ? 6 : 0, icon: Factory, to: "factory" as Tab },
+    { label: t.kPosts, sub: t.kPostsSub, v: demo ? "4 / 12" : 0, icon: Gauge, to: "factory" as Tab },
+    { label: t.kMsgs, sub: t.kMsgsSub, v: demo ? 9 : 0, icon: MessageCircle, to: "whatsapp" as Tab },
+  ];
+  const shortcuts = [
+    { label: t.scPost, icon: Factory, to: "factory" as Tab },
+    { label: t.scMsgs, icon: MessageCircle, to: "whatsapp" as Tab },
+    { label: t.scBrain, icon: Brain, to: "brain" as Tab },
+  ];
   return (
     <div className="grid gap-4 lg:grid-cols-3">
+      <section className="glass p-4 lg:col-span-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-display text-sm tracking-wider text-primary">{t.kpiTitle}</h2>
+          <div className="flex items-center gap-2 text-xs">
+            <span className={`rounded-full border px-2 py-0.5 font-mono ${demo ? "border-warning/50 text-warning" : "border-accent/50 text-accent"}`}>{demo ? t.demo : t.real}</span>
+            <button onClick={() => setDemo(!demo)} className="rounded-full border border-border px-3 py-0.5 text-muted-foreground hover:text-foreground">{demo ? t.hideDemo : t.showDemo}</button>
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {kpis.map((k) => (
+            <button key={k.label} onClick={() => go(k.to)} className="rounded-lg border border-border bg-background/40 p-4 text-start transition hover:border-primary">
+              <div className="flex items-center justify-between text-muted-foreground"><span className="text-sm">{k.label}</span><k.icon className="size-4 text-primary" /></div>
+              <div dir="ltr" className="mt-2 font-mono text-3xl text-foreground glow-text">{k.v}</div>
+              <div className="mt-1 text-xs text-muted-foreground">{!demo && k.v === 0 ? t.empty : k.sub}</div>
+            </button>
+          ))}
+        </div>
+        <h3 className="mb-2 mt-4 text-xs text-muted-foreground">{t.shortcuts}</h3>
+        <div className="grid grid-cols-3 gap-2">
+          {shortcuts.map((s) => (
+            <button key={s.label} onClick={() => go(s.to)} className="flex flex-col items-center gap-1 rounded-lg bg-primary/10 p-3 text-xs text-primary transition hover:bg-primary hover:text-primary-foreground sm:flex-row sm:justify-center sm:text-sm">
+              <s.icon className="size-4" />{s.label}
+            </button>
+          ))}
+        </div>
+      </section>
       <section className="glass p-4 lg:col-span-2">
         <h2 className="mb-3 font-display text-sm tracking-wider text-primary">{t.posts}</h2>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
