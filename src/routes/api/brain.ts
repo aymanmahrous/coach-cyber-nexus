@@ -65,7 +65,8 @@ export const Route = createFileRoute("/api/brain")({
         const enc = new TextEncoder();
         let buf = "";
         const stream = new ReadableStream({
-          async pull(controller) {
+          async start(controller) {
+            for (;;) {
             const { done, value } = await reader.read();
             if (done) return controller.close();
             buf += dec.decode(value, { stream: true });
@@ -82,6 +83,7 @@ export const Route = createFileRoute("/api/brain")({
               } catch {
                 /* ignore partial */
               }
+            }
             }
           },
           cancel() {
