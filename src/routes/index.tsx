@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { ContentFactory } from "@/components/ContentFactory";
+import { usePosts } from "@/lib/posts";
 import {
   Activity, Bell, Brain, Factory, FolderOpen, Gauge, Languages, MessageCircle, Send, Square, Trash2,
 } from "lucide-react";
@@ -149,7 +151,7 @@ function Cockpit() {
         <div className={tab === "brain" ? "" : "hidden"}>
           <BrainView t={t} log={log} setBrainState={setBrainState} />
         </div>
-        {tab === "factory" && <Phase2 t={t} title={t.tabs.factory} desc={t.factoryDesc} goBrain={() => setTab("brain")} />}
+        {tab === "factory" && <ContentFactory lang={lang} log={log} />}
         {tab === "whatsapp" && <Phase2 t={t} title={t.tabs.whatsapp} desc={t.waDesc} goBrain={() => setTab("brain")} numbers />}
         {tab === "vault" && <Phase2 t={t} title={t.tabs.vault} desc={t.vaultDesc} goBrain={() => setTab("brain")} />}
       </main>
@@ -178,9 +180,11 @@ function CockpitView({ t, notes, clear, go }: { t: TT; notes: Note[]; clear: () 
   const goBrain = () => go("brain");
   const cols = ["Scheduled", "Claimed", "Published", "Needs Review"] as const;
   const [demo, setDemo] = useState(false);
+  const { posts } = usePosts();
+  const cnt = (st: string) => posts.filter((p) => p.status === st).length;
   const kpis = [
-    { label: t.kContent, sub: t.kContentSub, v: demo ? 6 : 0, icon: Factory, to: "factory" as Tab },
-    { label: t.kPosts, sub: t.kPostsSub, v: demo ? "4 / 12" : 0, icon: Gauge, to: "factory" as Tab },
+    { label: t.kContent, sub: t.kContentSub, v: demo ? 6 : cnt("Needs Review"), icon: Factory, to: "factory" as Tab },
+    { label: t.kPosts, sub: t.kPostsSub, v: demo ? "4 / 12" : cnt("Scheduled") + cnt("Published") ? `${cnt("Scheduled")} / ${cnt("Published")}` : 0, icon: Gauge, to: "factory" as Tab },
     { label: t.kMsgs, sub: t.kMsgsSub, v: demo ? 9 : 0, icon: MessageCircle, to: "whatsapp" as Tab },
   ];
   const shortcuts = [
@@ -221,8 +225,8 @@ function CockpitView({ t, notes, clear, go }: { t: TT; notes: Note[]; clear: () 
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {cols.map((c) => (
             <div key={c} className="rounded-lg border border-border bg-background/40 p-3">
-              <div className="flex items-center justify-between text-xs text-muted-foreground"><span>{t.status[c]}</span><span className="font-mono text-2xl text-foreground">0</span></div>
-              <p className="mt-6 text-center text-[11px] text-muted-foreground">{t.noPosts}</p>
+              <div className="flex items-center justify-between text-xs text-muted-foreground"><span>{t.status[c]}</span><span className="font-mono text-2xl text-foreground">{cnt(c)}</span></div>
+              {cnt(c) === 0 && <p className="mt-6 text-center text-[11px] text-muted-foreground">{t.noPosts}</p>}
             </div>
           ))}
         </div>
