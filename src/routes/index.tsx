@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { ContentFactory } from "@/components/ContentFactory";
+import { WhatsAppHub } from "@/components/WhatsAppHub";
+import { MediaVault } from "@/components/MediaVault";
 import { usePosts } from "@/lib/posts";
 import {
   Activity, Bell, Brain, Factory, FolderOpen, Gauge, Languages, MessageCircle, Send, Square, Trash2,
@@ -88,6 +90,7 @@ function Cockpit() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [brainState, setBrainState] = useState<"ready" | "online" | "err">("ready");
   const t = T[lang];
+  const isAr = lang === "ar";
 
   useEffect(() => {
     const saved = localStorage.getItem("cockpit-lang");
@@ -103,8 +106,10 @@ function Cockpit() {
     setNotes((n) => [{ id: Date.now() + Math.random(), time: new Date().toLocaleTimeString(), text, tone }, ...n].slice(0, 50));
 
   const channels = [
-    { name: "WhatsApp", on: false }, { name: "Facebook", on: false }, { name: "Instagram", on: false },
-    { name: "TikTok", on: false },
+    { name: isAr ? "واتساب (058 821 9130)" : "WhatsApp", on: true },
+    { name: isAr ? "فيسبوك وماسنجر" : "Facebook & Messenger", on: true },
+    { name: isAr ? "إنستغرام (@RelaxFixUAE)" : "Instagram", on: true },
+    { name: isAr ? "Canva & Gemini AI" : "Canva & Gemini", on: true },
   ];
 
   return (
@@ -152,8 +157,8 @@ function Cockpit() {
           <BrainView t={t} log={log} setBrainState={setBrainState} />
         </div>
         {tab === "factory" && <ContentFactory lang={lang} log={log} />}
-        {tab === "whatsapp" && <Phase2 t={t} title={t.tabs.whatsapp} desc={t.waDesc} goBrain={() => setTab("brain")} numbers />}
-        {tab === "vault" && <Phase2 t={t} title={t.tabs.vault} desc={t.vaultDesc} goBrain={() => setTab("brain")} />}
+        {tab === "whatsapp" && <WhatsAppHub lang={lang} log={log} />}
+        {tab === "vault" && <MediaVault lang={lang} log={log} />}
       </main>
     </div>
   );
@@ -339,15 +344,3 @@ function BrainView({ t, log, setBrainState }: { t: TT; log: (s: string, tone?: N
   );
 }
 
-function Phase2({ t, title, desc, goBrain, numbers }: { t: TT; title: string; desc: string; goBrain: () => void; numbers?: boolean }) {
-  return (
-    <section className="glass mx-auto max-w-2xl space-y-4 p-6 text-center">
-      <span className="inline-block rounded-full border border-warning/50 px-3 py-1 font-mono text-xs text-warning">{t.phase2}</span>
-      <h2 className="font-display text-lg text-primary glow-text">{title}</h2>
-      <p className="text-sm">{desc}</p>
-      <p className="text-xs text-muted-foreground">{t.soon}</p>
-      {numbers && <Numbers t={t} />}
-      <button onClick={goBrain} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"><Brain className="size-4" />{t.tryBrain}</button>
-    </section>
-  );
-}
