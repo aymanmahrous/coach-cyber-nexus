@@ -1,10 +1,12 @@
 # Roadmap
 - [x] Phase 1: Cockpit HUD, bilingual AR/EN, Coach Brain AI chat, business info
-- [x] Cockpit KPI cards (content, posts, messages) with empty + labelled demo data
-- [x] Quick nav with active section + mobile support
-- [x] Shortcuts: create post, review messages, open Coach Brain
-- [x] Content Factory: plans, AI drafts, review/edit/approve/schedule, Canva & Gemini handoff (saved on this device)
-- [ ] Direct publishing to Facebook/Instagram/TikTok (needs Meta + TikTok business accounts)
-- [ ] Cloud sync of posts across devices (Lovable Cloud)
-- [ ] Phase 2: WhatsApp Concierge (needs WhatsApp Business API)
-- [ ] Phase 2: Media Vault (uploads + cloud links)
+- [x] Cockpit KPIs, quick nav, shortcuts
+- [x] Content Factory (ported from new-coach-: templates, poster studio, review/approve)
+- [x] Imported WhatsApp Hub + Media Vault screens from new-coach- (auto-reply default set to manual)
+- [x] /api/publish: real Facebook/Instagram publishing behind owner PIN (code ready, NOT live)
+- [ ] REVIEW REPORTED TO OWNER — waiting for approval before any further execution
+- [ ] Owner to supply Meta tokens + owner PIN (blocked: owner approval)
+- [ ] WhatsApp Hub shows sample conversations — replace with real inbox (needs WhatsApp Cloud API)
+- [ ] Canva route keeps login in server memory only — needs persistent storage (Lovable Cloud)
+- [ ] Posts saved on one device only — cloud sync (Lovable Cloud)
+- [ ] TikTok direct publishing (needs TikTok developer app approval)
