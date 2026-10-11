@@ -10,6 +10,9 @@ export type Post = {
   status: PostStatus;
   scheduledAt?: string;
   createdAt: string;
+  templateType?: "drill" | "carousel" | "transformation" | "branch_promo" | "quiz";
+  publishedExternalId?: string;
+  publishedExternalUrl?: string;
 };
 
 const KEY = "cockpit-posts";

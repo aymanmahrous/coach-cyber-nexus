@@ -81,6 +81,7 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
     const newAssets: MediaAsset[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      if (!file) continue;
       const isVideo = file.type.startsWith("video");
       const url = URL.createObjectURL(file);
 

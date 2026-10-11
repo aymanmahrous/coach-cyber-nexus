@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import crypto from "node:crypto";
 
-const CANVA_CLIENT_ID = (process.env.CANVA_CLIENT_ID || "OC-AaCRfP-VVcyS").trim();
-const CANVA_CLIENT_SECRET = (process.env.CANVA_CLIENT_SECRET || "").trim();
-const CANVA_BRAND_TEMPLATE_ID = (process.env.CANVA_BRAND_TEMPLATE_ID || "EAHVAAahmjU").trim();
+const CANVA_CLIENT_ID = (process.env["CANVA_CLIENT_ID"] || "OC-AaCRfP-VVcyS").trim();
+const CANVA_CLIENT_SECRET = (process.env["CANVA_CLIENT_SECRET"] || "").trim();
+const CANVA_BRAND_TEMPLATE_ID = (process.env["CANVA_BRAND_TEMPLATE_ID"] || "EAHVAAahmjU").trim();
 const CANVA_AUTH_URL = "https://www.canva.com/api/oauth/authorize";
 const CANVA_TOKEN_URL = "https://api.canva.com/rest/v1/oauth/token";
 const CANVA_SCOPES = "profile:read design:meta:read design:content:read design:content:write brandtemplate:meta:read brandtemplate:content:read";
@@ -23,7 +23,7 @@ function generatePkce() {
 }
 
 function getRedirectUri(request: Request): string {
-  const envUri = process.env.CANVA_REDIRECT_URI;
+  const envUri = process.env["CANVA_REDIRECT_URI"];
   if (envUri && envUri.trim()) return envUri.trim();
   const url = new URL(request.url);
   return `${url.origin}/api/canva?action=callback`;
@@ -148,7 +148,7 @@ export const Route = createFileRoute("/api/canva")({
         const body = (await request.json().catch(() => ({}))) as Record<string, any>;
         const redirectUri = getRedirectUri(request);
 
-        if (body.action === "get_auth_url") {
+        if (body["action"] === "get_auth_url") {
           const state = base64url(crypto.randomBytes(16));
           const { verifier, challenge } = generatePkce();
 

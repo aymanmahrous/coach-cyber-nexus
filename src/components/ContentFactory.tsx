@@ -454,6 +454,41 @@ function EnhancedPostCard({
     );
   };
 
+  const [imageUrl, setImageUrl] = useState("");
+  const [metaBusy, setMetaBusy] = useState(false);
+  const handleMetaPublish = async () => {
+    if (p.platform === "tiktok") return;
+    if (p.platform === "instagram" && !imageUrl.trim())
+      return log(isAr ? "إنستغرام يحتاج رابط صورة عام (من كانفا أو درايف)" : "Instagram needs a public image URL", "err");
+    if (!window.confirm(isAr ? `تأكيد النشر الفعلي الآن على ${PLAT[p.platform]}؟` : `Publish to ${PLAT[p.platform]} now?`)) return;
+    let pin = sessionStorage.getItem("owner-pin") || "";
+    if (!pin) pin = window.prompt(isAr ? "أدخل رمز المالك للنشر" : "Enter owner publish PIN") || "";
+    if (!pin) return;
+    setMetaBusy(true);
+    try {
+      const res = await fetch("/api/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin, platform: p.platform, caption: p.caption, imageUrl: imageUrl.trim() }) });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === "wrong_pin") sessionStorage.removeItem("owner-pin");
+        const msgs: Record<string, string> = {
+          wrong_pin: isAr ? "رمز المالك غير صحيح" : "Wrong PIN",
+          publish_pin_not_configured: isAr ? "لم يتم ضبط رمز المالك بعد" : "Owner PIN not set up yet",
+          facebook_not_configured: isAr ? "حساب فيسبوك غير مربوط بعد" : "Facebook not linked yet",
+          instagram_not_configured: isAr ? "حساب إنستغرام غير مربوط بعد" : "Instagram not linked yet",
+          instagram_needs_image: isAr ? "إنستغرام يحتاج رابط صورة" : "Instagram needs an image",
+        };
+        throw new Error(msgs[data.error] || data.message || data.error);
+      }
+      sessionStorage.setItem("owner-pin", pin);
+      update(p.id, { status: "Published", publishedExternalId: data.id, publishedExternalUrl: data.url } as Partial<Post>);
+      log(isAr ? `✅ تم النشر فعلياً على ${PLAT[p.platform]}` : `Published live on ${PLAT[p.platform]}`, "ok");
+    } catch (e) {
+      log(`${isAr ? "فشل النشر" : "Publish failed"}: ${(e as Error).message}`, "err");
+    } finally {
+      setMetaBusy(false);
+    }
+  };
+
   const handleConfirmPublished = () => {
     const finalUrl = customLiveUrl.trim() || getPlatformDefaultUrl(p.platform);
     update(p.id, {
@@ -692,11 +727,20 @@ function EnhancedPostCard({
                   className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 font-semibold text-primary-foreground shadow-sm"
                 >
                   <Send className="size-3.5" />
-                  {isAr ? `نشر مباشر على ${PLAT[p.platform]}` : `Publish to ${PLAT[p.platform]}`}
+                  {isAr ? `نشر يدوي (نسخ وفتح ${PLAT[p.platform]})` : `Manual post (copy & open ${PLAT[p.platform]})`}
                 </button>
               </>
             )}
 
+            {(p.status === "Scheduled" || p.status === "Claimed") && p.platform !== "tiktok" && (
+              <div className="w-full space-y-2 rounded-md border border-primary/30 p-2">
+                <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} dir="ltr" placeholder={isAr ? "رابط الصورة العام (مطلوب لإنستغرام)" : "Public image URL (required for Instagram)"} className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs" />
+                <button onClick={handleMetaPublish} disabled={metaBusy} className="flex w-full items-center justify-center gap-1 rounded-md bg-accent px-3 py-1.5 font-semibold text-accent-foreground disabled:opacity-50">
+                  <Zap className="size-3.5" />
+                  {metaBusy ? (isAr ? "جارٍ النشر…" : "Publishing…") : isAr ? `نشر فعلي الآن على ${PLAT[p.platform]}` : `Publish live to ${PLAT[p.platform]}`}
+                </button>
+              </div>
+            )}
             {(p.status === "Scheduled" || p.status === "Claimed") && (
               <>
                 <button
@@ -704,7 +748,7 @@ function EnhancedPostCard({
                   className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 font-semibold text-primary-foreground"
                 >
                   <Send className="size-3.5" />
-                  {isAr ? `نشر مباشر على ${PLAT[p.platform]}` : `Publish to ${PLAT[p.platform]}`}
+                  {isAr ? `نشر يدوي (نسخ وفتح ${PLAT[p.platform]})` : `Manual post (copy & open ${PLAT[p.platform]})`}
                 </button>
 
                 <button

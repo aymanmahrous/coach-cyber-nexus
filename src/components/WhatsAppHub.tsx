@@ -92,12 +92,12 @@ const TEMPLATES = [
 
 export function WhatsAppHub({ lang, log }: WhatsAppHubProps) {
   const isAr = lang === "ar";
-  const [autoPilotMode, setAutoPilotMode] = useState<"full_auto" | "alerts_only" | "manual">("full_auto");
+  const [autoPilotMode, setAutoPilotMode] = useState<"full_auto" | "alerts_only" | "manual">("manual");
   const [conversations, setConversations] = useState<LiveConversation[]>(SAMPLE_LIVE_CONVERSATIONS);
   const [selectedConv, setSelectedConv] = useState<LiveConversation | null>(null);
 
-  const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0].id);
-  const [customText, setCustomText] = useState(isAr ? TEMPLATES[0].textAr : TEMPLATES[0].textEn);
+  const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]!.id);
+  const [customText, setCustomText] = useState(isAr ? TEMPLATES[0]!.textAr : TEMPLATES[0]!.textEn);
   const [clientQuery, setClientQuery] = useState("");
   const [aiSuggestedReply, setAiSuggestedReply] = useState("");
   const [replyChannel, setReplyChannel] = useState<"whatsapp" | "messenger" | "instagram">("whatsapp");
