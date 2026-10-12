@@ -1,5 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { ExternalLink, FolderOpen, Image, Sparkles, Upload, Video, Check, Copy, ShieldCheck } from "lucide-react";
+import {
+  ExternalLink,
+  FolderOpen,
+  Image,
+  Sparkles,
+  Upload,
+  Video,
+  Check,
+  Copy,
+  ShieldCheck,
+} from "lucide-react";
 
 type Lang = "ar" | "en";
 
@@ -21,28 +31,28 @@ interface MediaAsset {
 const DEFAULT_ASSETS: MediaAsset[] = [
   {
     id: "asset-1",
-    name: "Relax Fix Brand Badge & Colors",
+    name: "Relax Fix Brand Badge Placeholder",
     type: "image",
     category: "brand",
     ratio: "1:1",
   },
   {
     id: "asset-2",
-    name: "Al Mushrif & Khalifa City Pools View",
+    name: "Abu Dhabi Pool Photo Placeholder",
     type: "image",
     category: "pool",
     ratio: "4:5",
   },
   {
     id: "asset-3",
-    name: "Freestyle Breathing Drill Slowmo",
+    name: "Freestyle Breathing Drill Placeholder",
     type: "video",
     category: "technique",
     ratio: "9:16",
   },
   {
     id: "asset-4",
-    name: "Kids Aquaphobia Progression Demo",
+    name: "Water Confidence Progression Placeholder",
     type: "video",
     category: "technique",
     ratio: "9:16",
@@ -53,37 +63,68 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
   const isAr = lang === "ar";
   const [assets, setAssets] = useState<MediaAsset[]>(DEFAULT_ASSETS);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [canvaConfig, setCanvaConfig] = useState<{ configured: boolean; clientId: string; brandTemplateId: string; connected: boolean }>({
-    configured: true,
-    clientId: "OC-AaCRfP-VVcyS",
+  const [canvaStatusError, setCanvaStatusError] = useState(false);
+  const [canvaConfig, setCanvaConfig] = useState<{
+    configured: boolean;
+    clientId: string;
+    brandTemplateId: string;
+    connected: boolean;
+  }>({
+    configured: false,
+    clientId: "",
     brandTemplateId: "EAHVAAahmjU",
     connected: false,
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const objectUrls = useRef<string[]>([]);
 
   const canvaBrandTemplateId = canvaConfig.brandTemplateId || "EAHVAAahmjU";
 
   useEffect(() => {
+    let active = true;
     fetch("/api/canva")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Canva status request failed (${r.status})`);
+        return r.json();
+      })
       .then((data) => {
         if (data && typeof data.configured === "boolean") {
-          setCanvaConfig(data);
+          if (active) setCanvaConfig(data);
+        } else if (active) {
+          setCanvaStatusError(true);
         }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (active) setCanvaStatusError(true);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
+
+  useEffect(
+    () => () => {
+      objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    },
+    [],
+  );
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     const newAssets: MediaAsset[] = [];
+    let unsupportedFiles = 0;
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       if (!file) continue;
-      const isVideo = file.type.startsWith("video");
+      const isVideo = file.type.startsWith("video/");
+      if (!isVideo && !file.type.startsWith("image/")) {
+        unsupportedFiles += 1;
+        continue;
+      }
       const url = URL.createObjectURL(file);
+      objectUrls.current.push(url);
 
       newAssets.push({
         id: `upload-${Date.now()}-${i}`,
@@ -96,11 +137,24 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
       });
     }
 
-    setAssets([...newAssets, ...assets]);
-    log(
-      isAr ? `تم رفع ${newAssets.length} ملف بنجاح إلى مخزن الوسائط` : `Uploaded ${newAssets.length} media items`,
-      "ok"
-    );
+    if (newAssets.length > 0) {
+      setAssets((current) => [...newAssets, ...current]);
+      log(
+        isAr
+          ? `تمت إضافة ${newAssets.length} معاينة محلية مؤقتة؛ لم تُرفع إلى خادم أو تخزين سحابي.`
+          : `Added ${newAssets.length} temporary local previews; files were not uploaded to a server or cloud storage.`,
+        "info",
+      );
+    }
+    if (unsupportedFiles > 0) {
+      log(
+        isAr
+          ? `تم تجاهل ${unsupportedFiles} ملفاً لأن نوعه ليس صورة أو فيديو.`
+          : `Skipped ${unsupportedFiles} file(s) that were not images or videos.`,
+        "err",
+      );
+    }
+    e.target.value = "";
   };
 
   const copyTemplateId = (id: string) => {
@@ -110,21 +164,18 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
     log(isAr ? "تم نسخ معرف قالب Canva" : "Canva template ID copied", "ok");
   };
 
-  const startCanvaAuth = async () => {
-    try {
-      const res = await fetch("/api/canva", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "get_auth_url" }),
-      });
-      const data = await res.json();
-      if (data.authUrl) {
-        log(isAr ? "فتح صفحة تفويض تطبيق Canva للمطورين…" : "Opening Canva OAuth…", "info");
-        window.open(data.authUrl, "_blank", "noopener");
-      }
-    } catch {
-      window.open("/api/canva?action=auth", "_blank", "noopener");
+  const startCanvaAuth = () => {
+    if (!canvaConfig.configured) {
+      log(
+        isAr
+          ? "أضف CANVA_CLIENT_ID وCANVA_CLIENT_SECRET إلى أسرار الخادم أولاً."
+          : "Set CANVA_CLIENT_ID and CANVA_CLIENT_SECRET as server secrets first.",
+        "err",
+      );
+      return;
     }
+    window.open("/api/canva?action=auth", "_blank", "noopener");
+    log(isAr ? "فتح صفحة تفويض Canva…" : "Opening Canva OAuth…", "info");
   };
 
   return (
@@ -134,12 +185,14 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-display text-sm tracking-wider text-primary">
-              {isAr ? "مخزن وسائط الأكاديمية واستوديو التصميم (Canva & Gemini)" : "Academy Media Vault & Creative Studio"}
+              {isAr
+                ? "معاينة الوسائط المحلية واستوديو التصميم (Canva & Gemini)"
+                : "Local Media Preview & Creative Studio"}
             </h2>
             <p className="text-xs text-muted-foreground">
               {isAr
-                ? "إدارة الصور وفيديوهات التدريب، وربط تطبيق Canva للمطورين، ومحرك Google Gemini للذكاء الاصطناعي"
-                : "Manage training footage, pool photos, Canva developer app, and Google Gemini AI generator"}
+                ? "المعاينات تبقى مؤقتاً في هذا الجهاز. التخزين السحابي ورفع الملفات للخادم غير مربوطين."
+                : "Previews are temporary on this device. Cloud storage and server uploads are not connected."}
             </p>
           </div>
           <div className="flex gap-2">
@@ -148,7 +201,7 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
               className="flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
             >
               <Upload className="size-4" />
-              {isAr ? "رفع وسائط من جهازك" : "Upload Media"}
+              {isAr ? "معاينة ملفات من جهازك" : "Preview Local Files"}
             </button>
             <input
               ref={fileInputRef}
@@ -171,19 +224,41 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
               </span>
               <span className="flex items-center gap-1 rounded bg-[#7D2AE8]/20 px-2 py-0.5 font-mono text-[11px] text-[#A855F7]">
                 <ShieldCheck className="size-3" />
-                {canvaConfig.clientId ? `ID: ${canvaConfig.clientId}` : "Configured"}
+                {canvaConfig.configured
+                  ? canvaConfig.connected
+                    ? isAr
+                      ? "متصل"
+                      : "Connected"
+                    : isAr
+                      ? "جاهز للربط"
+                      : "Ready to connect"
+                  : isAr
+                    ? "غير مُهيأ"
+                    : "Not configured"}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
               {isAr
-                ? "بيانات المطور معتمدة ومربوطة بالخادم. يمكنك تفويض التطبيق أو استخدام القالب المعتمد مباشرة."
-                : "Developer credentials configured. Authorize OAuth or use the template directly."}
+                ? canvaConfig.configured
+                  ? "بيانات Canva موجودة. حالة الاتصال لا تعني أن الرفع أو المزامنة السحابية مفعّلان."
+                  : "أضف CANVA_CLIENT_ID وCANVA_CLIENT_SECRET كأسرار للخادم قبل التفويض."
+                : canvaConfig.configured
+                  ? "Canva credentials are configured. This does not enable uploads or cloud sync by itself."
+                  : "Set CANVA_CLIENT_ID and CANVA_CLIENT_SECRET as server secrets before authorizing."}
             </p>
+            {canvaStatusError && (
+              <p role="status" className="text-xs text-destructive">
+                {isAr
+                  ? "تعذر قراءة حالة Canva من الخادم."
+                  : "Could not read Canva status from the server."}
+              </p>
+            )}
             <div className="flex flex-wrap gap-2 pt-1">
               <button
                 type="button"
                 onClick={startCanvaAuth}
-                className="flex items-center gap-1.5 rounded-md bg-[#7D2AE8] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#6b22c7] shadow-sm"
+                disabled={!canvaConfig.configured}
+                className="flex items-center gap-1.5 rounded-md bg-[#7D2AE8] px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#6b22c7] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <ExternalLink className="size-3.5" />
                 {isAr ? "تفويض حساب Canva (OAuth)" : "Authorize Canva"}
@@ -210,7 +285,11 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
                 onClick={() => copyTemplateId(canvaBrandTemplateId)}
                 className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-secondary"
               >
-                {copiedId === canvaBrandTemplateId ? <Check className="size-3 text-accent" /> : <Copy className="size-3" />}
+                {copiedId === canvaBrandTemplateId ? (
+                  <Check className="size-3 text-accent" />
+                ) : (
+                  <Copy className="size-3" />
+                )}
                 {isAr ? "نسخ معرف القالب" : "Copy ID"}
               </button>
             </div>
@@ -273,7 +352,7 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
       {/* Asset Grid */}
       <section className="glass space-y-3 p-4">
         <h3 className="font-display text-sm tracking-wider text-primary">
-          {isAr ? "الأصول المتاحة للاستخدام في النشر" : "Available Media Assets"}
+          {isAr ? "المعاينات المحلية والقوالب الإرشادية" : "Local previews and sample placeholders"}
         </h3>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -284,7 +363,11 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
             >
               <div className="flex items-center justify-between text-xs">
                 <span className="flex items-center gap-1 text-muted-foreground">
-                  {asset.type === "video" ? <Video className="size-3.5 text-accent" /> : <Image className="size-3.5 text-primary" />}
+                  {asset.type === "video" ? (
+                    <Video className="size-3.5 text-accent" />
+                  ) : (
+                    <Image className="size-3.5 text-primary" />
+                  )}
                   {asset.type.toUpperCase()}
                 </span>
                 <span className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
@@ -309,7 +392,13 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
               <div>
                 <p className="truncate text-xs font-medium text-foreground">{asset.name}</p>
                 <p className="text-[11px] text-muted-foreground">
-                  {isAr ? "جاهز للتطبيق على القالب الإعلاني" : "Ready for social campaigns"}
+                  {asset.isUploaded
+                    ? isAr
+                      ? "معاينة محلية مؤقتة — غير مرفوعة"
+                      : "Temporary local preview — not uploaded"
+                    : isAr
+                      ? "عنصر إرشادي — لا يحتوي ملفاً فعلياً"
+                      : "Placeholder — no actual media file"}
                 </p>
               </div>
             </div>

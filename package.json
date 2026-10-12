@@ -7,9 +7,11 @@
     "dev": "vite dev",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "preview": "vite preview",
+    "preview": "nitro preview",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "deploy": "npm run build && npx nitro deploy --prebuilt",
+    "deploy:cloudflare": "npm run build && npx nitro deploy --prebuilt"
   },
   "overrides": {
     "rolldown": "1.2.1"
@@ -86,6 +88,7 @@
     "prettier": "^3.7.3",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "8.1.5"
+    "vite": "8.1.5",
+    "wrangler": "^4.149.0"
   }
 }

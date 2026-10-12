@@ -26,7 +26,9 @@ export const Route = createFileRoute("/api/publish")({
         json({
           pin: !!process.env["OWNER_PUBLISH_PIN"],
           facebook: !!process.env["FACEBOOK_PAGE_ACCESS_TOKEN"],
-          instagram: !!(process.env["INSTAGRAM_ACCESS_TOKEN"] || process.env["FACEBOOK_PAGE_ACCESS_TOKEN"]),
+          instagram: !!(
+            process.env["INSTAGRAM_ACCESS_TOKEN"] || process.env["FACEBOOK_PAGE_ACCESS_TOKEN"]
+          ),
         }),
       POST: async ({ request }) => {
         const parsed = Body.safeParse(await request.json().catch(() => null));
@@ -47,8 +49,11 @@ export const Route = createFileRoute("/api/publish")({
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({ ...params, access_token: token }),
           });
-          const data = (await res.json().catch(() => ({}))) as Record<string, any>;
-          if (!res.ok || data["error"]) throw new Error(data["error"]?.message || `Meta error ${res.status}`);
+          const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & {
+            error?: { message?: string };
+          };
+          if (!res.ok || data["error"])
+            throw new Error(data["error"]?.message || `Meta error ${res.status}`);
           return data;
         };
 
@@ -68,8 +73,16 @@ export const Route = createFileRoute("/api/publish")({
           if (!imageUrl) return json({ error: "instagram_needs_image" }, 400);
           const igId = process.env["INSTAGRAM_ACCOUNT_ID"] || "17841439747493221";
           const container = await call(`${igId}/media`, { image_url: imageUrl, caption }, igToken);
-          const pub = await call(`${igId}/media_publish`, { creation_id: String(container["id"]) }, igToken);
-          return json({ ok: true, id: String(pub["id"]), url: "https://www.instagram.com/RelaxFixUAE" });
+          const pub = await call(
+            `${igId}/media_publish`,
+            { creation_id: String(container["id"]) },
+            igToken,
+          );
+          return json({
+            ok: true,
+            id: String(pub["id"]),
+            url: "https://www.instagram.com/RelaxFixUAE",
+          });
         } catch (e) {
           return json({ error: "meta_error", message: (e as Error).message }, 502);
         }

@@ -6,11 +6,13 @@ const CANVA_CLIENT_SECRET = (process.env["CANVA_CLIENT_SECRET"] || "").trim();
 const CANVA_BRAND_TEMPLATE_ID = (process.env["CANVA_BRAND_TEMPLATE_ID"] || "EAHVAAahmjU").trim();
 const CANVA_AUTH_URL = "https://www.canva.com/api/oauth/authorize";
 const CANVA_TOKEN_URL = "https://api.canva.com/rest/v1/oauth/token";
-const CANVA_SCOPES = "profile:read design:meta:read design:content:read design:content:write brandtemplate:meta:read brandtemplate:content:read";
+const CANVA_SCOPES =
+  "profile:read design:meta:read design:content:read design:content:write brandtemplate:meta:read brandtemplate:content:read";
 
-// In-memory session store for PKCE verifiers & tokens
-const oauthStates = new Map<string, { verifier: string; createdAt: number; redirectUri: string }>();
-let savedCanvaTokens: { accessToken: string; refreshToken?: string; expiresAt: number } | null = null;
+const OAUTH_COOKIE_PREFIX = "canva_oauth_";
+const OAUTH_STATE_MAX_AGE = 15 * 60;
+let savedCanvaTokens: { accessToken: string; refreshToken?: string; expiresAt: number } | null =
+  null;
 
 function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -29,6 +31,39 @@ function getRedirectUri(request: Request): string {
   return `${url.origin}/api/canva?action=callback`;
 }
 
+function oauthCookieName(state: string): string {
+  return `${OAUTH_COOKIE_PREFIX}${state}`;
+}
+
+function readCookie(request: Request, name: string): string | undefined {
+  const cookie = request.headers.get("cookie");
+  if (!cookie) return undefined;
+  for (const part of cookie.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0 || part.slice(0, separator).trim() !== name) continue;
+    return part.slice(separator + 1).trim();
+  }
+  return undefined;
+}
+
+function appendOauthCookie(response: Response, request: Request, name: string, value: string) {
+  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  response.headers.append(
+    "Set-Cookie",
+    `${name}=${encodeURIComponent(value)}; HttpOnly; SameSite=Lax; Path=/api/canva; Max-Age=${OAUTH_STATE_MAX_AGE}${secure}`,
+  );
+}
+
+function clearOauthCookie(response: Response, request: Request, state: string) {
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(state)) return;
+  response.headers.append(
+    "Set-Cookie",
+    `${oauthCookieName(state)}=; HttpOnly; SameSite=Lax; Path=/api/canva; Max-Age=0${
+      new URL(request.url).protocol === "https:" ? "; Secure" : ""
+    }`,
+  );
+}
+
 export const Route = createFileRoute("/api/canva")({
   server: {
     handlers: {
@@ -38,17 +73,12 @@ export const Route = createFileRoute("/api/canva")({
 
         // 1. Authorize: Redirect user to Canva OAuth consent screen
         if (action === "auth") {
+          if (!CANVA_CLIENT_SECRET) {
+            return Response.redirect(`${url.origin}/?canva_status=not_configured`, 302);
+          }
           const redirectUri = getRedirectUri(request);
           const state = base64url(crypto.randomBytes(16));
           const { verifier, challenge } = generatePkce();
-
-          oauthStates.set(state, { verifier, createdAt: Date.now(), redirectUri });
-
-          // Cleanup states older than 15 mins
-          const cutoff = Date.now() - 15 * 60 * 1000;
-          for (const [k, v] of oauthStates.entries()) {
-            if (v.createdAt < cutoff) oauthStates.delete(k);
-          }
 
           const authUrl = new URL(CANVA_AUTH_URL);
           authUrl.searchParams.set("response_type", "code");
@@ -59,7 +89,9 @@ export const Route = createFileRoute("/api/canva")({
           authUrl.searchParams.set("code_challenge_method", "S256");
           authUrl.searchParams.set("state", state);
 
-          return Response.redirect(authUrl.toString(), 302);
+          const response = Response.redirect(authUrl.toString(), 302);
+          appendOauthCookie(response, request, oauthCookieName(state), verifier);
+          return response;
         }
 
         // 2. Callback: Handle redirect back from Canva
@@ -72,27 +104,39 @@ export const Route = createFileRoute("/api/canva")({
           const clientOrigin = url.origin;
 
           if (error) {
-            return Response.redirect(
+            const response = Response.redirect(
               `${clientOrigin}/?canva_status=error&message=${encodeURIComponent(errorDesc || error)}`,
-              302
+              302,
             );
+            if (state) clearOauthCookie(response, request, state);
+            return response;
           }
 
           if (!code) {
-            return Response.redirect(`${clientOrigin}/?canva_status=missing_code`, 302);
+            const response = Response.redirect(`${clientOrigin}/?canva_status=missing_code`, 302);
+            if (state) clearOauthCookie(response, request, state);
+            return response;
           }
 
-          const stored = oauthStates.get(state);
-          const codeVerifier = stored?.verifier || "";
-          const redirectUri = stored?.redirectUri || getRedirectUri(request);
+          const codeVerifier = /^[A-Za-z0-9_-]{20,64}$/.test(state)
+            ? readCookie(request, oauthCookieName(state))
+            : undefined;
+          if (!codeVerifier || !CANVA_CLIENT_SECRET) {
+            const response = Response.redirect(`${clientOrigin}/?canva_status=invalid_state`, 302);
+            if (state) clearOauthCookie(response, request, state);
+            return response;
+          }
+          const redirectUri = getRedirectUri(request);
 
           try {
-            const basicAuth = Buffer.from(`${CANVA_CLIENT_ID}:${CANVA_CLIENT_SECRET}`).toString("base64");
+            const basicAuth = Buffer.from(`${CANVA_CLIENT_ID}:${CANVA_CLIENT_SECRET}`).toString(
+              "base64",
+            );
             const tokenParams = new URLSearchParams({
               grant_type: "authorization_code",
               code,
               redirect_uri: redirectUri,
-              ...(codeVerifier ? { code_verifier: codeVerifier } : {}),
+              code_verifier: codeVerifier,
             });
 
             const tokenRes = await fetch(CANVA_TOKEN_URL, {
@@ -107,28 +151,50 @@ export const Route = createFileRoute("/api/canva")({
             if (!tokenRes.ok) {
               const errBody = await tokenRes.text();
               console.error("Canva token exchange failed:", tokenRes.status, errBody);
-              return Response.redirect(
+              const response = Response.redirect(
                 `${clientOrigin}/?canva_status=exchange_failed&detail=${encodeURIComponent(errBody.slice(0, 100))}`,
-                302
+                302,
               );
+              clearOauthCookie(response, request, state);
+              return response;
             }
 
-            const tokenData = await tokenRes.json();
+            const tokenData: unknown = await tokenRes.json();
+            if (
+              !tokenData ||
+              typeof tokenData !== "object" ||
+              !("access_token" in tokenData) ||
+              typeof tokenData.access_token !== "string" ||
+              !tokenData.access_token
+            ) {
+              throw new Error("Canva returned an invalid token response");
+            }
+            const expiresIn =
+              "expires_in" in tokenData &&
+              typeof tokenData.expires_in === "number" &&
+              Number.isFinite(tokenData.expires_in) &&
+              tokenData.expires_in > 0
+                ? tokenData.expires_in
+                : 14400;
             savedCanvaTokens = {
               accessToken: tokenData.access_token,
-              refreshToken: tokenData.refresh_token,
-              expiresAt: Date.now() + (tokenData.expires_in || 14400) * 1000,
+              ...("refresh_token" in tokenData && typeof tokenData.refresh_token === "string"
+                ? { refreshToken: tokenData.refresh_token }
+                : {}),
+              expiresAt: Date.now() + expiresIn * 1000,
             };
 
-            oauthStates.delete(state);
-
-            return Response.redirect(`${clientOrigin}/?canva_status=connected`, 302);
+            const response = Response.redirect(`${clientOrigin}/?canva_status=connected`, 302);
+            clearOauthCookie(response, request, state);
+            return response;
           } catch (e) {
             console.error("Canva callback error:", e);
-            return Response.redirect(
+            const response = Response.redirect(
               `${clientOrigin}/?canva_status=error&message=${encodeURIComponent((e as Error).message)}`,
-              302
+              302,
             );
+            clearOauthCookie(response, request, state);
+            return response;
           }
         }
 
@@ -140,19 +206,20 @@ export const Route = createFileRoute("/api/canva")({
             brandTemplateId: CANVA_BRAND_TEMPLATE_ID,
             connected: Boolean(savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now()),
           }),
-          { headers: { "Content-Type": "application/json" } }
+          { headers: { "Content-Type": "application/json" } },
         );
       },
 
       POST: async ({ request }) => {
-        const body = (await request.json().catch(() => ({}))) as Record<string, any>;
+        const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
         const redirectUri = getRedirectUri(request);
 
         if (body["action"] === "get_auth_url") {
+          if (!CANVA_CLIENT_SECRET) {
+            return Response.json({ error: "canva_not_configured" }, { status: 503 });
+          }
           const state = base64url(crypto.randomBytes(16));
           const { verifier, challenge } = generatePkce();
-
-          oauthStates.set(state, { verifier, createdAt: Date.now(), redirectUri });
 
           const authUrl = new URL(CANVA_AUTH_URL);
           authUrl.searchParams.set("response_type", "code");
@@ -163,14 +230,16 @@ export const Route = createFileRoute("/api/canva")({
           authUrl.searchParams.set("code_challenge_method", "S256");
           authUrl.searchParams.set("state", state);
 
-          return new Response(
+          const response = new Response(
             JSON.stringify({
               success: true,
               authUrl: authUrl.toString(),
               redirectUri,
             }),
-            { headers: { "Content-Type": "application/json" } }
+            { headers: { "Content-Type": "application/json" } },
           );
+          appendOauthCookie(response, request, oauthCookieName(state), verifier);
+          return response;
         }
 
         return new Response(
@@ -180,7 +249,7 @@ export const Route = createFileRoute("/api/canva")({
             brandTemplateId: CANVA_BRAND_TEMPLATE_ID,
             connected: Boolean(savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now()),
           }),
-          { headers: { "Content-Type": "application/json" } }
+          { headers: { "Content-Type": "application/json" } },
         );
       },
     },

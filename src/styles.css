@@ -65,7 +65,8 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
-:root, .dark {
+:root,
+.dark {
   --radius: 0.9rem;
   --background: oklch(0.14 0.03 250);
   --foreground: oklch(0.95 0.02 220);
@@ -87,7 +88,11 @@
   --border: oklch(0.82 0.15 200 / 0.18);
   --input: oklch(0.82 0.15 200 / 0.25);
   --ring: oklch(0.82 0.15 200);
-  --chart-1: oklch(0.82 0.15 200); --chart-2: oklch(0.78 0.17 150); --chart-3: oklch(0.82 0.16 80); --chart-4: oklch(0.7 0.2 320); --chart-5: oklch(0.65 0.22 25);
+  --chart-1: oklch(0.82 0.15 200);
+  --chart-2: oklch(0.78 0.17 150);
+  --chart-3: oklch(0.82 0.16 80);
+  --chart-4: oklch(0.7 0.2 320);
+  --chart-5: oklch(0.65 0.22 25);
   --sidebar: oklch(0.17 0.035 248 / 0.7);
   --sidebar-foreground: oklch(0.95 0.02 220);
   --sidebar-primary: oklch(0.82 0.15 200);
@@ -112,7 +117,11 @@
       radial-gradient(50rem 30rem at -10% 110%, oklch(0.78 0.17 150 / 0.1), transparent 60%),
       linear-gradient(oklch(0.82 0.15 200 / 0.04) 1px, transparent 1px),
       linear-gradient(90deg, oklch(0.82 0.15 200 / 0.04) 1px, transparent 1px);
-    background-size: auto, auto, 32px 32px, 32px 32px;
+    background-size:
+      auto,
+      auto,
+      32px 32px,
+      32px 32px;
     background-attachment: fixed;
     min-height: 100vh;
   }
@@ -123,7 +132,9 @@
   border: 1px solid var(--border);
   backdrop-filter: blur(14px);
   border-radius: var(--radius);
-  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.05), 0 10px 40px -20px oklch(0.82 0.15 200 / 0.35);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.05),
+    0 10px 40px -20px oklch(0.82 0.15 200 / 0.35);
 }
 
 @utility glow-text {
@@ -131,9 +142,26 @@
 }
 
 @layer base {
-  .prose-hud p { margin: 0.4rem 0; }
-  .prose-hud ul, .prose-hud ol { padding-inline-start: 1.2rem; margin: 0.4rem 0; list-style: disc; }
-  .prose-hud ol { list-style: decimal; }
-  .prose-hud strong { color: var(--primary); }
-  .prose-hud h1, .prose-hud h2, .prose-hud h3 { font-weight: 700; margin: 0.6rem 0 0.3rem; color: var(--primary); }
+  .prose-hud p {
+    margin: 0.4rem 0;
+  }
+  .prose-hud ul,
+  .prose-hud ol {
+    padding-inline-start: 1.2rem;
+    margin: 0.4rem 0;
+    list-style: disc;
+  }
+  .prose-hud ol {
+    list-style: decimal;
+  }
+  .prose-hud strong {
+    color: var(--primary);
+  }
+  .prose-hud h1,
+  .prose-hud h2,
+  .prose-hud h3 {
+    font-weight: 700;
+    margin: 0.6rem 0 0.3rem;
+    color: var(--primary);
+  }
 }

@@ -1,4 +1,5 @@
 # Roadmap
+
 - [x] Phase 1: Cockpit HUD, bilingual AR/EN, Coach Brain AI chat, business info
 - [x] Cockpit KPIs, quick nav, shortcuts
 - [x] Content Factory (ported from new-coach-: templates, poster studio, review/approve)

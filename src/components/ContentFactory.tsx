@@ -1,5 +1,21 @@
 import { useState } from "react";
-import { Check, Copy, ExternalLink, Pencil, Sparkles as Spark, Trash2, Wand2, Send, Calendar, LayoutTemplate, Zap, Image as ImageIcon, Eye, EyeOff } from "lucide-react";
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Pencil,
+  Sparkles as Spark,
+  Trash2,
+  Wand2,
+  Send,
+  Calendar,
+  LayoutTemplate,
+  Zap,
+  Image as ImageIcon,
+  Eye,
+  EyeOff,
+} from "lucide-react";
+import { z } from "zod";
 import { usePosts, type Platform, type Post } from "@/lib/posts";
 import { BrandedPosterStudio } from "./BrandedPosterStudio";
 
@@ -13,19 +29,74 @@ interface EnhancedPost extends Post {
   publishedExternalUrl?: string;
 }
 
-const TEMPLATE_INFO: Record<PostTemplate, { labelAr: string; labelEn: string; ratio: string; canvaType: string }> = {
-  drill: { labelAr: "ريلز تكتيك وتصحيح تكنيك (9:16)", labelEn: "Technique Drill (9:16 Reel)", ratio: "9:16", canvaType: "Instagram Reel / TikTok Video" },
-  carousel: { labelAr: "إنفوجرافيك خطوات تعليمية (4:5)", labelEn: "Educational Carousel (4:5)", ratio: "4:5", canvaType: "Instagram Carousel" },
-  transformation: { labelAr: "قصة نجاح وعلاج رهبة الماء (4:5)", labelEn: "Transformation Story (4:5)", ratio: "4:5", canvaType: "Instagram Post" },
-  branch_promo: { labelAr: "عرض باقات فروع أبوظبي (1:1)", labelEn: "Abu Dhabi Branches Promo (1:1)", ratio: "1:1", canvaType: "Square Social Post" },
-  quiz: { labelAr: "سؤال وتحدي تفاعلي للجمهور (9:16)", labelEn: "Interactive Quiz / Poll (9:16)", ratio: "9:16", canvaType: "Story / Reel" },
+const AiResponseSchema = z.object({
+  posts: z
+    .array(
+      z.object({
+        platform: z.enum(["facebook", "instagram", "tiktok"]),
+        templateType: z
+          .enum(["drill", "carousel", "transformation", "branch_promo", "quiz"])
+          .optional(),
+        caption: z.string().min(1),
+        visual: z.string().optional(),
+      }),
+    )
+    .min(1),
+});
+
+function parseAiResponse(text: string) {
+  const jsonStart = text.indexOf("{");
+  const jsonEnd = text.lastIndexOf("}");
+  if (jsonStart === -1 || jsonEnd === -1) throw new Error("Invalid AI response");
+  return AiResponseSchema.parse(JSON.parse(text.slice(jsonStart, jsonEnd + 1)));
+}
+
+const TEMPLATE_INFO: Record<
+  PostTemplate,
+  { labelAr: string; labelEn: string; ratio: string; canvaType: string }
+> = {
+  drill: {
+    labelAr: "ريلز تكتيك وتصحيح تكنيك (9:16)",
+    labelEn: "Technique Drill (9:16 Reel)",
+    ratio: "9:16",
+    canvaType: "Instagram Reel / TikTok Video",
+  },
+  carousel: {
+    labelAr: "إنفوجرافيك خطوات تعليمية (4:5)",
+    labelEn: "Educational Carousel (4:5)",
+    ratio: "4:5",
+    canvaType: "Instagram Carousel",
+  },
+  transformation: {
+    labelAr: "قصة نجاح وعلاج رهبة الماء (4:5)",
+    labelEn: "Transformation Story (4:5)",
+    ratio: "4:5",
+    canvaType: "Instagram Post",
+  },
+  branch_promo: {
+    labelAr: "عرض باقات فروع أبوظبي (1:1)",
+    labelEn: "Abu Dhabi Branches Promo (1:1)",
+    ratio: "1:1",
+    canvaType: "Square Social Post",
+  },
+  quiz: {
+    labelAr: "سؤال وتحدي تفاعلي للجمهور (9:16)",
+    labelEn: "Interactive Quiz / Poll (9:16)",
+    ratio: "9:16",
+    canvaType: "Story / Reel",
+  },
 };
 
 const L = {
   ar: {
     title: "مصنع المحتوى الذكي",
     plan: "مدة الخطة",
-    plans: { instant: "فوري (منشور واحد)", daily: "خطة اليوم", "3days": "3 أيام متنوعة", week: "أسبوع كامل (7 قوالب)" },
+    plans: {
+      instant: "فوري (منشور واحد)",
+      daily: "خطة اليوم",
+      "3days": "3 أيام متنوعة",
+      week: "أسبوع كامل (7 قوالب)",
+    },
     platforms: "المنصات المستهدفة",
     topic: "فكرة أو موضوع مخصص (اختياري)",
     topicPh: "مثال: تصحيح النفس في السباحة الحرة، أو عروض فرع مدينة خليفة والمشرف",
@@ -33,17 +104,17 @@ const L = {
     generating: "كوتش براين يصيغ المحتوى…",
     manual: "إضافة منشور يدوي",
     review: "بانتظار المراجعة والاعتماد",
-    scheduled: "مجدولة ومجهزة للنشر",
+    scheduled: "خطة محلية بموعد مقترح",
     published: "منشورة ومؤكدة",
     empty: "لا منشورات في هذه القائمة بعد.",
-    approve: "اعتماد وجدولة",
+    approve: "اعتماد الخطة محلياً",
     publishNow: "نشر فوري معتمد",
     publishing: "جارٍ النشر…",
     edit: "تعديل",
     save: "حفظ",
     cancel: "إلغاء",
     del: "حذف",
-    when: "موعد وتاريخ النشر",
+    when: "الموعد المقترح",
     markPub: "تأكيد النشر",
     backReview: "إرجاع للمراجعة",
     copy: "نسخ النص",
@@ -55,7 +126,8 @@ const L = {
     caption: "نص المنشور والخطاف",
     visual: "موجز التصميم وهوية القالب",
     templateLabel: "نوع القالب والتصميم:",
-    guard: "حماية الأكاديمية: لا يتم سحب رصيد إعلاني أو نشر عشوائي. كل منشور يتطلب مراجعتك واعتمادك لضمان جودة وهوية كابتن أيمن.",
+    guard:
+      "حماية الأكاديمية: لا يتم النشر أو سحب رصيد تلقائياً. الخطط والمنشورات تُحفظ على هذا الجهاز فقط؛ لا تُجدول أو تُنشر على المنصات إلا بعد ربط الحسابات وموافقتك اليدوية.",
     err: "تعذر التوليد",
     needWhen: "حدد موعد وتاريخ النشر أولاً",
     fbPage: "صفحة فيسبوك: 1164107840123575",
@@ -64,7 +136,12 @@ const L = {
   en: {
     title: "Smart Content Factory",
     plan: "Plan Duration",
-    plans: { instant: "Instant (1 post)", daily: "Today's Plan", "3days": "3 Varied Days", week: "Full Week (7 distinct styles)" },
+    plans: {
+      instant: "Instant (1 post)",
+      daily: "Today's Plan",
+      "3days": "3 Varied Days",
+      week: "Full Week (7 distinct styles)",
+    },
     platforms: "Platforms",
     topic: "Custom Topic / Focus (optional)",
     topicPh: "e.g. Freestyle breathing drill or Khalifa City branch special",
@@ -72,17 +149,17 @@ const L = {
     generating: "Coach Brain is crafting content…",
     manual: "Add Manual Post",
     review: "Awaiting Review",
-    scheduled: "Scheduled",
+    scheduled: "Local plan (suggested time)",
     published: "Published & Verified",
     empty: "No posts in this stage yet.",
-    approve: "Approve & Schedule",
+    approve: "Approve local plan",
     publishNow: "Publish Now",
     publishing: "Publishing…",
     edit: "Edit",
     save: "Save",
     cancel: "Cancel",
     del: "Delete",
-    when: "Scheduled Publish Time",
+    when: "Suggested publish time",
     markPub: "Mark Published",
     backReview: "Back to Review",
     copy: "Copy Text",
@@ -94,7 +171,8 @@ const L = {
     caption: "Caption & Hook",
     visual: "Visual Style & Brief",
     templateLabel: "Template Style:",
-    guard: "Academy Protection: Zero auto-spend, zero blind posting. Every piece of content requires your approval.",
+    guard:
+      "Academy Protection: No automatic publishing or ad spend. Plans and posts are saved on this device only; they are not scheduled on social platforms unless accounts are connected and you manually approve.",
     err: "Generation failed",
     needWhen: "Select publish time first",
     fbPage: "Facebook Page: 1164107840123575",
@@ -102,11 +180,21 @@ const L = {
   },
 };
 
-const PLAT: Record<Platform, string> = { facebook: "Facebook", instagram: "Instagram", tiktok: "TikTok 9:16" };
+const PLAT: Record<Platform, string> = {
+  facebook: "Facebook",
+  instagram: "Instagram",
+  tiktok: "TikTok 9:16",
+};
 const COUNT: Record<Plan, number> = { instant: 1, daily: 1, "3days": 3, week: 7 };
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-export function ContentFactory({ lang, log }: { lang: Lang; log: (s: string, tone?: "info" | "ok" | "err") => void }) {
+export function ContentFactory({
+  lang,
+  log,
+}: {
+  lang: Lang;
+  log: (s: string, tone?: "info" | "ok" | "err") => void;
+}) {
   const t = L[lang];
   const { posts, save } = usePosts();
   const [plan, setPlan] = useState<Plan>("3days");
@@ -124,12 +212,13 @@ export function ContentFactory({ lang, log }: { lang: Lang; log: (s: string, ton
     setBusy(true);
     const n = COUNT[plan];
     const prompt = `Create ${n} social media post(s) for Coach Ayman Swimming Academy in Abu Dhabi.
+Requested post count: ${n}
 Target Platforms: ${plats.map((p) => PLAT[p]).join(", ")}.
 Topic Focus: ${topic || "Mix of technique correction, fear of water progressive therapy, and Abu Dhabi pool branches"}.
 Language: ${lang === "ar" ? "Gulf-friendly professional Arabic" : "English"}.
 Official Booking WhatsApp: 058 821 9130.
 Pool branches: Al Mushrif, Al Falah, Khalifa City, Al Danah.
-STRICT MARKETING RULE: DO NOT put numerical prices (AED) in the public social post captions or visuals! Focus on technique, overcoming water fear, and Call to Action to book a FREE initial assessment via WhatsApp: 058 821 9130. Prices are reserved for qualified leads in private chat.
+STRICT MARKETING RULE: DO NOT put numerical prices (AED) in the public social post captions or visuals! Focus on technique, overcoming water fear, and invite people to inquire via WhatsApp: 058 821 9130. Prices are reserved for qualified leads in private chat. Never invent customer testimonials, results, schedules, limited availability, or facility/safety claims. If TikTok is selected, every TikTok post must use a vertical 9:16 drill or quiz format.
 
 CRITICAL INSTRUCTION: DO NOT use the same visual format or template for all posts! Vary the template style across:
 1) "drill" (9:16 vertical video reel with 3s hook)
@@ -149,20 +238,31 @@ Return ONLY valid JSON, no markdown fences, matching this structure:
       });
       if (!res.ok) throw new Error(await res.text());
       const txt = await res.text();
-      const jsonStart = txt.indexOf("{");
-      const jsonEnd = txt.lastIndexOf("}");
-      if (jsonStart === -1 || jsonEnd === -1) throw new Error("Invalid AI response");
-      const json = JSON.parse(txt.slice(jsonStart, jsonEnd + 1));
+      const json = parseAiResponse(txt);
 
-      const templateKeys: PostTemplate[] = ["drill", "carousel", "transformation", "branch_promo", "quiz"];
+      const templateKeys: PostTemplate[] = [
+        "drill",
+        "carousel",
+        "transformation",
+        "branch_promo",
+        "quiz",
+      ];
 
-      const items: EnhancedPost[] = (json.posts || [])
-        .filter((p: any) => plats.includes(p.platform) && p.caption)
-        .map((p: any, index: number) => ({
+      const items: EnhancedPost[] = json.posts
+        .filter((p) => plats.includes(p.platform))
+        .slice(0, n)
+        .map((p, index) => ({
           id: uid(),
-          platform: p.platform,
-          templateType: (p.templateType && templateKeys.includes(p.templateType) ? p.templateType : templateKeys[index % templateKeys.length]) as PostTemplate,
-          caption: p.caption,
+          platform: p.platform as Platform,
+          templateType:
+            p.platform === "tiktok"
+              ? p.templateType === "quiz"
+                ? "quiz"
+                : "drill"
+              : p.templateType && templateKeys.includes(p.templateType as PostTemplate)
+                ? (p.templateType as PostTemplate)
+                : templateKeys[index % templateKeys.length]!,
+          caption: p.caption || "",
           visual: p.visual || "",
           status: "Needs Review",
           createdAt: new Date().toISOString(),
@@ -179,15 +279,21 @@ Return ONLY valid JSON, no markdown fences, matching this structure:
   }
 
   async function generateAutoPilotWeek() {
-    if (busy) return;
+    if (!plats.length || busy) return;
     setBusy(true);
-    log(lang === "ar" ? "⚡ جارٍ توليد وجدولة أسبوع كامل بالطيار الآلي بمختلف القوالب…" : "⚡ Generating full Auto-Pilot week…", "info");
+    log(
+      lang === "ar"
+        ? "جارٍ إعداد مسودة خطة محتوى لسبعة أيام للمراجعة اليدوية…"
+        : "Preparing a seven-day content plan for manual review…",
+      "info",
+    );
 
     const prompt = `Create a full 7-day social media publishing schedule for Coach Ayman Swimming Academy in Abu Dhabi.
-Target Platforms: Instagram, Facebook.
+Requested post count: 7
+Target Platforms: ${plats.map((p) => PLAT[p]).join(", ")}.
 Official Booking WhatsApp: 058 821 9130.
 Pool branches: Al Mushrif, Al Falah, Khalifa City, Al Danah.
-STRICT MARKETING RULE: DO NOT include numerical prices (AED) in the public captions or visuals! Direct audience to book a FREE assessment on WhatsApp 058 821 9130 to qualify leads.
+STRICT MARKETING RULE: DO NOT include numerical prices (AED) in the public captions or visuals! Invite people to inquire via WhatsApp 058 821 9130. Never invent customer testimonials, results, schedules, limited availability, or facility/safety claims. If TikTok is selected, every TikTok post must use a vertical 9:16 drill or quiz format.
 
 CRITICAL: Return exactly 7 varied posts across all 5 styles:
 1) drill (9:16 vertical video reel with 3s hook)
@@ -209,33 +315,53 @@ Return ONLY valid JSON matching this structure:
       });
       if (!res.ok) throw new Error(await res.text());
       const txt = await res.text();
-      const jsonStart = txt.indexOf("{");
-      const jsonEnd = txt.lastIndexOf("}");
-      if (jsonStart === -1 || jsonEnd === -1) throw new Error("Invalid AI response");
-      const json = JSON.parse(txt.slice(jsonStart, jsonEnd + 1));
+      const json = parseAiResponse(txt);
 
-      const templateKeys: PostTemplate[] = ["drill", "carousel", "transformation", "branch_promo", "quiz", "carousel", "drill"];
+      const templateKeys: PostTemplate[] = [
+        "drill",
+        "carousel",
+        "transformation",
+        "branch_promo",
+        "quiz",
+        "carousel",
+        "drill",
+      ];
       const now = Date.now();
 
-      const items: EnhancedPost[] = (json.posts || [])
-        .slice(0, 7)
-        .map((p: any, index: number) => {
-          const scheduledDate = new Date(now + (index + 1) * 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
-          return {
-            id: uid(),
-            platform: p.platform || (index % 2 === 0 ? "instagram" : "facebook"),
-            templateType: (p.templateType && ["drill", "carousel", "transformation", "branch_promo", "quiz"].includes(p.templateType) ? p.templateType : templateKeys[index % templateKeys.length]) as PostTemplate,
-            caption: p.caption,
-            visual: p.visual || "",
-            status: "Scheduled" as const,
-            scheduledAt: scheduledDate,
-            createdAt: new Date().toISOString(),
-          };
-        });
+      const items: EnhancedPost[] = json.posts.slice(0, 7).map((p, index: number) => {
+        const scheduledDate = new Date(now + (index + 1) * 24 * 60 * 60 * 1000)
+          .toISOString()
+          .slice(0, 16);
+        const platform = plats.includes(p.platform)
+          ? p.platform
+          : plats[index % plats.length] || "instagram";
+        return {
+          id: uid(),
+          platform,
+          templateType:
+            platform === "tiktok"
+              ? p.templateType === "quiz"
+                ? "quiz"
+                : "drill"
+              : p.templateType
+                ? p.templateType
+                : templateKeys[index % templateKeys.length]!,
+          caption: p.caption || "",
+          visual: p.visual || "",
+          status: "Needs Review" as const,
+          scheduledAt: scheduledDate,
+          createdAt: new Date().toISOString(),
+        };
+      });
 
       if (!items.length) throw new Error("empty response");
       save([...items, ...enhancedPosts]);
-      log(lang === "ar" ? `✅ تم توليد وجدولة أسبوع كامل (${items.length} منشورات) بنجاح!` : `Scheduled full week (${items.length} posts)!`, "ok");
+      log(
+        lang === "ar"
+          ? `تم إعداد خطة أولية من ${items.length} منشورات؛ راجعها واعتمد كل منشور قبل النشر.`
+          : `Prepared ${items.length} draft posts. Review and approve each before publishing.`,
+        "ok",
+      );
     } catch (e) {
       log(`${t.err}: ${(e as Error).message}`, "err");
     } finally {
@@ -259,7 +385,13 @@ Return ONLY valid JSON matching this structure:
 
   const groups: { key: string; title: string; items: EnhancedPost[] }[] = [
     { key: "r", title: t.review, items: enhancedPosts.filter((p) => p.status === "Needs Review") },
-    { key: "s", title: t.scheduled, items: enhancedPosts.filter((p) => p.status === "Scheduled" || p.status === "Claimed").sort((a, b) => (a.scheduledAt || "").localeCompare(b.scheduledAt || "")) },
+    {
+      key: "s",
+      title: t.scheduled,
+      items: enhancedPosts
+        .filter((p) => p.status === "Scheduled" || p.status === "Claimed")
+        .sort((a, b) => (a.scheduledAt || "").localeCompare(b.scheduledAt || "")),
+    },
     { key: "p", title: t.published, items: enhancedPosts.filter((p) => p.status === "Published") },
   ];
 
@@ -283,7 +415,9 @@ Return ONLY valid JSON matching this structure:
                 key={k}
                 onClick={() => setPlan(k)}
                 className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                  plan === k ? "border-primary bg-primary text-primary-foreground font-semibold" : "border-border text-muted-foreground hover:text-foreground"
+                  plan === k
+                    ? "border-primary bg-primary text-primary-foreground font-semibold"
+                    : "border-border text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {t.plans[k]}
@@ -302,7 +436,9 @@ Return ONLY valid JSON matching this structure:
                   key={p}
                   onClick={() => setPlats(on ? plats.filter((x) => x !== p) : [...plats, p])}
                   className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition ${
-                    on ? "border-accent text-accent font-medium" : "border-border text-muted-foreground"
+                    on
+                      ? "border-accent text-accent font-medium"
+                      : "border-border text-muted-foreground"
                   }`}
                 >
                   {on && <Check className="size-3.5" />}
@@ -326,11 +462,11 @@ Return ONLY valid JSON matching this structure:
         <div className="flex flex-wrap gap-2">
           <button
             onClick={generateAutoPilotWeek}
-            disabled={busy}
+            disabled={busy || !plats.length}
             className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50 shadow-sm"
           >
             <Zap className={`size-4 ${busy ? "animate-spin" : ""}`} />
-            {lang === "ar" ? "⚡ جدولة أسبوع كامل بالطيار الآلي" : "⚡ 1-Click Auto-Pilot Week"}
+            {lang === "ar" ? "إعداد خطة محتوى لأسبوع للمراجعة" : "Prepare a 7-day content draft"}
           </button>
           <button
             onClick={generate}
@@ -340,7 +476,10 @@ Return ONLY valid JSON matching this structure:
             <Wand2 className={`size-4 ${busy ? "animate-spin" : ""}`} />
             {busy ? t.generating : t.generate}
           </button>
-          <button onClick={addManual} className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-secondary">
+          <button
+            onClick={addManual}
+            className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-secondary"
+          >
             {t.manual}
           </button>
         </div>
@@ -450,7 +589,7 @@ function EnhancedPostCard({
       isAr
         ? `📋 تم نسخ النص والهاشتاجات وجارٍ فتح صفحة ${PLAT[p.platform]} للنشر المباشر!`
         : `Copied caption & opened ${PLAT[p.platform]} composer!`,
-      "info"
+      "info",
     );
   };
 
@@ -459,29 +598,63 @@ function EnhancedPostCard({
   const handleMetaPublish = async () => {
     if (p.platform === "tiktok") return;
     if (p.platform === "instagram" && !imageUrl.trim())
-      return log(isAr ? "إنستغرام يحتاج رابط صورة عام (من كانفا أو درايف)" : "Instagram needs a public image URL", "err");
-    if (!window.confirm(isAr ? `تأكيد النشر الفعلي الآن على ${PLAT[p.platform]}؟` : `Publish to ${PLAT[p.platform]} now?`)) return;
+      return log(
+        isAr
+          ? "إنستغرام يحتاج رابط صورة عام (من كانفا أو درايف)"
+          : "Instagram needs a public image URL",
+        "err",
+      );
+    if (
+      !window.confirm(
+        isAr
+          ? `تأكيد النشر الفعلي الآن على ${PLAT[p.platform]}؟`
+          : `Publish to ${PLAT[p.platform]} now?`,
+      )
+    )
+      return;
     let pin = sessionStorage.getItem("owner-pin") || "";
     if (!pin) pin = window.prompt(isAr ? "أدخل رمز المالك للنشر" : "Enter owner publish PIN") || "";
     if (!pin) return;
     setMetaBusy(true);
     try {
-      const res = await fetch("/api/publish", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin, platform: p.platform, caption: p.caption, imageUrl: imageUrl.trim() }) });
+      const res = await fetch("/api/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pin,
+          platform: p.platform,
+          caption: p.caption,
+          imageUrl: imageUrl.trim(),
+        }),
+      });
       const data = await res.json();
       if (!res.ok) {
         if (data.error === "wrong_pin") sessionStorage.removeItem("owner-pin");
         const msgs: Record<string, string> = {
           wrong_pin: isAr ? "رمز المالك غير صحيح" : "Wrong PIN",
-          publish_pin_not_configured: isAr ? "لم يتم ضبط رمز المالك بعد" : "Owner PIN not set up yet",
+          publish_pin_not_configured: isAr
+            ? "لم يتم ضبط رمز المالك بعد"
+            : "Owner PIN not set up yet",
           facebook_not_configured: isAr ? "حساب فيسبوك غير مربوط بعد" : "Facebook not linked yet",
-          instagram_not_configured: isAr ? "حساب إنستغرام غير مربوط بعد" : "Instagram not linked yet",
+          instagram_not_configured: isAr
+            ? "حساب إنستغرام غير مربوط بعد"
+            : "Instagram not linked yet",
           instagram_needs_image: isAr ? "إنستغرام يحتاج رابط صورة" : "Instagram needs an image",
         };
         throw new Error(msgs[data.error] || data.message || data.error);
       }
       sessionStorage.setItem("owner-pin", pin);
-      update(p.id, { status: "Published", publishedExternalId: data.id, publishedExternalUrl: data.url } as Partial<Post>);
-      log(isAr ? `✅ تم النشر فعلياً على ${PLAT[p.platform]}` : `Published live on ${PLAT[p.platform]}`, "ok");
+      update(p.id, {
+        status: "Published",
+        publishedExternalId: data.id,
+        publishedExternalUrl: data.url,
+      } as Partial<Post>);
+      log(
+        isAr
+          ? `✅ تم النشر فعلياً على ${PLAT[p.platform]}`
+          : `Published live on ${PLAT[p.platform]}`,
+        "ok",
+      );
     } catch (e) {
       log(`${isAr ? "فشل النشر" : "Publish failed"}: ${(e as Error).message}`, "err");
     } finally {
@@ -500,7 +673,7 @@ function EnhancedPostCard({
       isAr
         ? `✅ تم تأكيد اكتمال النشر على ${PLAT[p.platform]} بنجاح!`
         : `Confirmed publication on ${PLAT[p.platform]}!`,
-      "ok"
+      "ok",
     );
   };
 
@@ -537,7 +710,13 @@ function EnhancedPostCard({
           className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 font-medium"
         >
           <ImageIcon className="size-3" />
-          {showStudio ? (isAr ? "إخفاء البوستر" : "Hide Poster") : (isAr ? "عرض البوستر والشعار" : "Show Poster")}
+          {showStudio
+            ? isAr
+              ? "إخفاء البوستر"
+              : "Hide Poster"
+            : isAr
+              ? "عرض البوستر والشعار"
+              : "Show Poster"}
         </button>
       </div>
 
@@ -602,7 +781,10 @@ function EnhancedPostCard({
               {t.save}
             </button>
             {p.caption && (
-              <button onClick={() => setEditing(false)} className="rounded-md border border-border px-3 py-1.5 text-sm">
+              <button
+                onClick={() => setEditing(false)}
+                className="rounded-md border border-border px-3 py-1.5 text-sm"
+              >
                 {t.cancel}
               </button>
             )}
@@ -662,8 +844,8 @@ function EnhancedPostCard({
                 p.platform === "instagram"
                   ? "https://www.instagram.com/p/..."
                   : p.platform === "facebook"
-                  ? "https://www.facebook.com/..."
-                  : "https://www.tiktok.com/@..."
+                    ? "https://www.facebook.com/..."
+                    : "https://www.tiktok.com/@..."
               }
               className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground"
             />
@@ -727,17 +909,39 @@ function EnhancedPostCard({
                   className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 font-semibold text-primary-foreground shadow-sm"
                 >
                   <Send className="size-3.5" />
-                  {isAr ? `نشر يدوي (نسخ وفتح ${PLAT[p.platform]})` : `Manual post (copy & open ${PLAT[p.platform]})`}
+                  {isAr
+                    ? `نشر يدوي (نسخ وفتح ${PLAT[p.platform]})`
+                    : `Manual post (copy & open ${PLAT[p.platform]})`}
                 </button>
               </>
             )}
 
             {(p.status === "Scheduled" || p.status === "Claimed") && p.platform !== "tiktok" && (
               <div className="w-full space-y-2 rounded-md border border-primary/30 p-2">
-                <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} dir="ltr" placeholder={isAr ? "رابط الصورة العام (مطلوب لإنستغرام)" : "Public image URL (required for Instagram)"} className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs" />
-                <button onClick={handleMetaPublish} disabled={metaBusy} className="flex w-full items-center justify-center gap-1 rounded-md bg-accent px-3 py-1.5 font-semibold text-accent-foreground disabled:opacity-50">
+                <input
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  dir="ltr"
+                  placeholder={
+                    isAr
+                      ? "رابط الصورة العام (مطلوب لإنستغرام)"
+                      : "Public image URL (required for Instagram)"
+                  }
+                  className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                />
+                <button
+                  onClick={handleMetaPublish}
+                  disabled={metaBusy}
+                  className="flex w-full items-center justify-center gap-1 rounded-md bg-accent px-3 py-1.5 font-semibold text-accent-foreground disabled:opacity-50"
+                >
                   <Zap className="size-3.5" />
-                  {metaBusy ? (isAr ? "جارٍ النشر…" : "Publishing…") : isAr ? `نشر فعلي الآن على ${PLAT[p.platform]}` : `Publish live to ${PLAT[p.platform]}`}
+                  {metaBusy
+                    ? isAr
+                      ? "جارٍ النشر…"
+                      : "Publishing…"
+                    : isAr
+                      ? `نشر فعلي الآن على ${PLAT[p.platform]}`
+                      : `Publish live to ${PLAT[p.platform]}`}
                 </button>
               </div>
             )}
@@ -748,7 +952,9 @@ function EnhancedPostCard({
                   className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 font-semibold text-primary-foreground"
                 >
                   <Send className="size-3.5" />
-                  {isAr ? `نشر يدوي (نسخ وفتح ${PLAT[p.platform]})` : `Manual post (copy & open ${PLAT[p.platform]})`}
+                  {isAr
+                    ? `نشر يدوي (نسخ وفتح ${PLAT[p.platform]})`
+                    : `Manual post (copy & open ${PLAT[p.platform]})`}
                 </button>
 
                 <button
@@ -784,10 +990,16 @@ function EnhancedPostCard({
                   >
                     <span>
                       {p.platform === "instagram"
-                        ? (isAr ? "مشاهدة على إنستغرام" : "View on Instagram")
+                        ? isAr
+                          ? "مشاهدة على إنستغرام"
+                          : "View on Instagram"
                         : p.platform === "facebook"
-                        ? (isAr ? "مشاهدة على فيسبوك" : "View on Facebook")
-                        : (isAr ? "مشاهدة على تيك توك" : "View on TikTok")}
+                          ? isAr
+                            ? "مشاهدة على فيسبوك"
+                            : "View on Facebook"
+                          : isAr
+                            ? "مشاهدة على تيك توك"
+                            : "View on TikTok"}
                     </span>
                     <ExternalLink className="size-3" />
                   </a>

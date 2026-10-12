@@ -26,7 +26,8 @@ Core Identity & Knowledge:
    - ZERO PRICING IN PUBLIC ADS: Absolutely NEVER include numerical prices (AED) in public social media posts, reels, or ads. Prices are strictly reserved for qualified leads in private chat (WhatsApp / Messenger).
    - Visual Previews & Image Generation: When asked for an image or visual concept, generate a detailed visual design prompt optimized for Canva and Google Gemini AI (detailing color palette: Deep Navy #0B192C, Cyan/Aqua #00ADB5, aspect ratios 1:1 or 9:16 or 4:5, athlete posture, lighting, and Arabic typography).
 5) Safety & Honesty Rule:
-   - Never claim you published or charged money without the owner's manual approval. Zero fake actions.`;
+   - Never claim you published or charged money without the owner's manual approval. Zero fake actions.
+   - Never invent customer testimonials, results, schedules, limited availability, facility/safety claims, or connected integrations. If a detail is unknown, say so and ask the owner to confirm it.`;
 
 const Body = z.object({
   messages: z
@@ -153,54 +154,89 @@ export const Route = createFileRoute("/api/brain")({
         // 4. Intelligent Local Knowledge Engine (No dead ends / 100% reliable fallback)
         // Checks if this is a Content Factory JSON generation request:
         if (lastUserMessage.includes("Return ONLY JSON") || lastUserMessage.includes('"posts":[')) {
-          const isWeek = lastUserMessage.includes("7") || lastUserMessage.includes("week") || lastUserMessage.includes("أسبوع");
-          
           const fullWeekPosts = [
             {
               platform: "instagram",
               templateType: "drill",
               caption: `⚡ سر التنفس الانسيابي في السباحة الحرة دون إرهاق!\n\nمعظم السباحين المبتدئين يرفعون رؤوسهم للأعلى مما يغرق الجزء السفلي من الجسم. الحل الهندسي هو تدوير الرأس مع الكتف بمقدار 90 درجة فقط.\n\n📍 فروع التدريب: المشرف، الفلاح، مدينة خليفة، الدانة.\n📲 احجز تقييمك المجاني مع كابتن أيمن: 058 821 9130\n\n#سباحة_أبوظبي #كابتن_أيمن #RelaxFixUAE #تعليم_سباحة`,
-              visual: "فيديو ريلز 9:16: لقطة بطيئة تحت الماء لتصحيح وضعية الرأس مع دوران الكتف، ألوان كحلي وأزرق مائي مع شعار Relax Fix UAE",
+              visual:
+                "فيديو ريلز 9:16: لقطة بطيئة تحت الماء لتصحيح وضعية الرأس مع دوران الكتف، ألوان كحلي وأزرق مائي مع شعار Relax Fix UAE",
             },
             {
               platform: "instagram",
               templateType: "carousel",
               caption: `🌊 4 خطوات مدروسة لعلاج رهبة الماء عند الأطفال نهائياً\n\nالخوف من الماء أمر طبيعي وشائع. في أكاديمية ريلاكس فيكس نبدأ بالتعود البصري، تمارين الطفو، ثم التنفس الهادئ دون أي ضغط أو إجبار.\n\n🔹 جلسات خاصة VIP 1-on-1 لبناء الأمان\n🔹 مجموعات تدريبية أقصاها 4 أطفال لمتابعة دقيقة\n\n📍 متواجدون في 4 فروع بأبوظبي: المشرف، الفلاح، مدينة خليفة، الدانة.\n📲 تواصل لحجز التقييم المبدئي المجاني: 058 821 9130\n\n#أكاديمية_السباحة #أبوظبي #تعليم_سباحة_أبوظبي #RelaxFixUAE`,
-              visual: "كاروسيل إنفوجرافيك 4:5: 4 شرائح توضح خطوات الطفو والتأقلم النفسي، هوية الأكاديمية الكحلية والمائية، وشعار Relax Fix",
+              visual:
+                "كاروسيل إنفوجرافيك 4:5: 4 شرائح توضح خطوات الطفو والتأقلم النفسي، هوية الأكاديمية الكحلية والمائية، وشعار Relax Fix",
             },
             {
               platform: "facebook",
               templateType: "transformation",
-              caption: `🌟 قصة نجاح: من الخوف من وضع الوجه في الماء إلى السباحة الحرة بثقة!\n\nخلال 6 حصص فقط وبمنهجية التدرج النفسي لكابتن أيمن، استطاع بطلنا الصغير التغلب على حاجز الخوف والسباحة بمفرده في المسبح الكبير.\n\n📍 المسبح الأقرب لك: المشرف، الفلاح، مدينة خليفة، الدانة / النجدة.\n📲 احجز موعد تقييم طفلك المجاني الآن عبر واتساب: 058 821 9130\n\n#قصص_نجاح #سباحة_أطفال #كابتن_أيمن #RelaxFixUAE`,
-              visual: "بوستر قصة نجاح 4:5: صورة طفل يبتسم بثقة داخل المسبح مع كابتن أيمن، مع شارة فروع أبوظبي وعرض التقييم المجاني",
+              caption: `🌟 خطوات تدريجية لبناء الثقة في الماء\n\nابدأ بالتعوّد على بيئة المسبح، ثم جرّب تمارين التنفس والطفو المناسبة لمستوى السباح، دون استعجال أو ضغط. تختلف سرعة التقدم من شخص لآخر.\n\n📍 اسأل عن الفروع والمواعيد المتاحة: المشرف، الفلاح، مدينة خليفة، الدانة / النجدة.\n📲 للاستفسار عن تقييم السباحة: 058 821 9130\n\n#سباحة_أطفال #كابتن_أيمن #RelaxFixUAE`,
+              visual:
+                "بوستر توعوي 4:5: خطوات تدريجية لبناء الثقة في الماء، دون استخدام صور أو ادعاءات توحي بقصة عميل حقيقية",
             },
             {
               platform: "facebook",
               templateType: "branch_promo",
               caption: `🏊‍♂️ برنامج السباحة الاحترافي للأطفال وبناء الثقة في أبوظبي!\n\nتحت إشراف كابتن أيمن مباشرة: تطوير مهارات السباحة، تصحيح التكنيك، وبناء أمان تام في الماء.\n\n✨ مميزات برامجنا:\n🔹 جلسات خاصة VIP لعلاج رهبة الماء وبناء المهارات\n🔹 مجموعات تدريبية ممتعة للأطفال مع متابعة دقيقة (أقصاها 4 أطفال)\n🔹 فترات صباحية ومسائية تناسب العائلة\n\n📍 متواجدون في: المشرف، الفلاح، مدينة خليفة، الدانة / النجدة.\n📲 احجز جلسة التقييم الأولي المجانية لطفلك الآن عبر واتساب: 058 821 9130\n(أرسل لنا رسالة لتحديد الفرع والموعد الأنسب لك)\n\n#سباحة_أبوظبي #RelaxFixUAE #كابتن_أيمن`,
-              visual: "بوستر إعلاني 1:1: ألوان الأكاديمية الرسمية (كحلي وأزرق مائي)، صورة طفل يسبح بثقة وفرح، مع إبراز فروع أبوظبي وعرض التقييم المجاني بدون ذكر الأسعار",
+              visual:
+                "بوستر إعلاني 1:1: ألوان الأكاديمية الرسمية (كحلي وأزرق مائي)، صورة طفل يسبح بثقة وفرح، مع إبراز فروع أبوظبي وعرض التقييم المجاني بدون ذكر الأسعار",
             },
             {
               platform: "instagram",
               templateType: "quiz",
               caption: `🤔 سؤال وتحدي للسباحين: ما هي الضربة الأكثر استهلاكاً للطاقة وسعرات حرارية؟\n\n1) السباحة الحرة (Freestyle)\n2) سباحة الفراشة (Butterfly)\n3) سباحة الصدر (Breaststroke)\n\nشاركونا إجابتكم في التعليقات! ولتطوير تكنيك الفراشة والصدر مع كابتن أيمن، احجز جلستك المجانية عبر واتساب: 058 821 9130\n\n#تحدي_السباحة #RelaxFixUAE #سباحة_أبوظبي`,
-              visual: "تصميم تفاعلي ستوري/ريلز 9:16: سؤال الاستطلاع مع أزرار الخيارات الثلاثة وخلفية مائية رياضية ديناميكية",
+              visual:
+                "تصميم تفاعلي ستوري/ريلز 9:16: سؤال الاستطلاع مع أزرار الخيارات الثلاثة وخلفية مائية رياضية ديناميكية",
             },
             {
               platform: "facebook",
               templateType: "carousel",
-              caption: `🛡️ 3 قواعد ذهبية لأمان وسلامة طفلك في المسبح هذا الموسم\n\n1) عدم النزول بدون مدرب متخصص أو إشراف مباشر\n2) تعلم التحكم بالطفو على الظهر كأول مهارة نجاة حيوية\n3) عدم القفز في المياه الضحلة قبل تقييم العمق\n\n📍 نوفر أعلى معايير الأمان بمجموعات أقصاها 4 أطفال في مسابح معقمة بالكامل.\n📲 احجز تقييم طفلك الآمن: 058 821 9130\n\n#أمان_المسابح #سباحة_أبوظبي #RelaxFixUAE`,
-              visual: "إنفوجرافيك توعوي 4:5: إرشادات الأمان المائي مع أيقونات بصرية زرقاء واضحة وشعار الأكاديمية الرسمي",
+              caption: `🛡️ تذكير بإرشادات السلامة حول المسبح\n\n1) اتبع تعليمات المسبح والمنقذين.\n2) لا تترك الأطفال دون إشراف بالغ.\n3) لا تقفز قبل التأكد من عمق الماء وخلو المنطقة.\n\nللاستفسار عن دروس السباحة في أبوظبي: 058 821 9130\n\n#أمان_المسابح #سباحة_أبوظبي #RelaxFixUAE`,
+              visual:
+                "إنفوجرافيك توعوي 4:5: إرشادات الأمان المائي مع أيقونات بصرية زرقاء واضحة وشعار الأكاديمية الرسمي",
             },
             {
               platform: "instagram",
               templateType: "drill",
-              caption: `🎯 تقييم السباحة المجاني 100% لعطلة نهاية الأسبوع في أبوظبي!\n\nهل ترغب بمعرفة مستوى طفلك بدقة وتحديد الخطة الأنسب له؟ يقيّم كابتن أيمن مستوى السباح بنفسه في أقرب مسبح لك.\n\n📍 الفروع المتاحة: المشرف • الفلاح • مدينة خليفة • الدانة\n📲 الأماكن محدودة — احجز موعدك المجاني عبر واتساب الآن: 058 821 9130\n\n#تقييم_مجاني #كابتن_أيمن #RelaxFixUAE #أبوظبي`,
-              visual: "ريلز عمودي 9:16: خطاف تصوير سريع لحصة تقييم حقيقية للأطفال مع كابتن أيمن والدعوة للحجز الفوري عبر واتساب",
+              caption: `🎯 هل ترغب في معرفة مستوى السباح؟\n\nتواصل معنا للاستفسار عن التقييم الأولي والمواعيد والفروع المتاحة في أبوظبي.\n\n📍 المشرف • الفلاح • مدينة خليفة • الدانة / النجدة\n📲 واتساب الحجوزات: 058 821 9130\n\n#كابتن_أيمن #RelaxFixUAE #أبوظبي`,
+              visual:
+                "ريلز عمودي 9:16: خطاف تصوير سريع لحصة تقييم حقيقية للأطفال مع كابتن أيمن والدعوة للحجز الفوري عبر واتساب",
             },
           ];
 
-          const responsePosts = isWeek ? fullWeekPosts : fullWeekPosts.slice(0, 3);
+          const requestedCount = Math.min(
+            fullWeekPosts.length,
+            Math.max(1, Number(lastUserMessage.match(/Requested post count:\s*(\d+)/i)?.[1] ?? 1)),
+          );
+          const requestedPlatforms = lastUserMessage.match(/Target Platforms?:\s*([^\n]+)/i)?.[1];
+          const platformTargets = [
+            ...(requestedPlatforms?.toLowerCase().includes("facebook")
+              ? ["facebook" as const]
+              : []),
+            ...(requestedPlatforms?.toLowerCase().includes("instagram")
+              ? ["instagram" as const]
+              : []),
+            ...(requestedPlatforms?.toLowerCase().includes("tiktok") ? ["tiktok" as const] : []),
+          ];
+          const selectedPlatforms = platformTargets.length
+            ? platformTargets
+            : ["instagram", "facebook"];
+          const responsePosts = fullWeekPosts.slice(0, requestedCount).map((post, index) => {
+            const platform = selectedPlatforms[index % selectedPlatforms.length]!;
+            const isTikTok = platform === "tiktok";
+            return {
+              ...post,
+              platform,
+              ...(isTikTok
+                ? {
+                    templateType: index % 2 === 0 ? "drill" : "quiz",
+                    visual: `${post.visual} — فيديو عمودي 9:16 مناسب لـ TikTok.`,
+                  }
+                : {}),
+            };
+          });
           return new Response(JSON.stringify({ posts: responsePosts }), {
             headers: { "Content-Type": "application/json; charset=utf-8" },
           });
@@ -254,7 +290,12 @@ Aspect Ratio: 4:5 vertical portrait.
 1. افتح **[Google Gemini](https://gemini.google.com/app)**.
 2. الصق هذا البرومبت واضغط إنتر.
 3. سيعطيك Gemini 4 خيارات تصويرية فائقة الواقعية يمكنك حفظها واستخدامها في الإعلانات فوراً.`;
-        } else if (query.includes("رهبة") || query.includes("خوف") || query.includes("aquaphobia") || query.includes("مسبح")) {
+        } else if (
+          query.includes("رهبة") ||
+          query.includes("خوف") ||
+          query.includes("aquaphobia") ||
+          query.includes("مسبح")
+        ) {
           responseText = `## 🌊 منهجية كابتن أيمن لعلاج رهبة الماء وسيكولوجية أولياء الأمور
 
 أهلاً كابتن أيمن! إليك الدليل الميداني المعتمد للتعامل مع خوف الأطفال من الماء وتحويل استفسار ولي الأمر إلى حجز مؤكد:
@@ -275,7 +316,13 @@ Aspect Ratio: 4:5 vertical portrait.
 - خصم الإخوة: **400 درهم لكل طفل**.
 - الحصص الخاصة الفردية: **150 / 250 درهم**.
 - الحجز الرسمي والمتابعة: **058 821 9130** في فروع (المشرف، الفلاح، مدينة خليفة، الدانة).`;
-        } else if (query.includes("تكنيك") || query.includes("حرة") || query.includes("صدر") || query.includes("ظهر") || query.includes("تنفس")) {
+        } else if (
+          query.includes("تكنيك") ||
+          query.includes("حرة") ||
+          query.includes("صدر") ||
+          query.includes("ظهر") ||
+          query.includes("تنفس")
+        ) {
           responseText = `## 🏊‍♂️ التحليل الفني وتصحيح تكنيك السباحة مع كابتن أيمن
 
 أهلاً كابتن أيمن! إليك تصحيح أبرز الأخطاء الشائعة في السباحة مع تمارين التصحيح المعتمدة:
@@ -292,8 +339,8 @@ Aspect Ratio: 4:5 vertical portrait.
 📍 متواجدون في مسابح أبوظبي المجهزة: **المشرف، الفلاح، مدينة خليفة، الدانة**.
 📲 لحجز جلسات التقييم وتطوير التكنيك: **058 821 9130**.`;
         } else {
-          responseText = `## 1. الخلاصة والرأي الموصى به
-أهلاً بك كابتن أيمن في مركز القيادة الذكي لأكاديمية السباحة. الأكاديمية تعمل بكامل طاقتها وجاهزة بفروعها الأربعة في أبوظبي: **المشرف، الفلاح، مدينة خليفة، الدانة**.
+          responseText = `## معلومات الأكاديمية
+أهلاً بك كابتن أيمن. تتضمن معلومات الأكاديمية المسجلة فروع أبوظبي التالية: **المشرف، الفلاح، مدينة خليفة، الدانة / النجدة**. لا تتوفر لديّ بيانات مباشرة عن حالة التشغيل أو المواعيد الحالية.
 
 ## 2. إمكانيات كوتش براين ومصنع المحتوى
 - **توليد خطط النشر وتصاميم Canva**: يمكنك إنشاء منشورات ريلز وإنفوجرافيك وتصدير مواصفاتها لـ Canva مباشرة.

@@ -1,7 +1,14 @@
 import { useState } from "react";
 import {
-  Check, Copy, ExternalLink, MessageCircle, Phone, Send, Sparkles, ShieldCheck,
-  Zap, Bot, CheckCircle2, AlertTriangle, UserCheck, Clock, Radio, Eye
+  Check,
+  Copy,
+  ExternalLink,
+  MessageCircle,
+  Phone,
+  Send,
+  Sparkles,
+  ShieldCheck,
+  CheckCircle2,
 } from "lucide-react";
 
 type Lang = "ar" | "en";
@@ -18,46 +25,9 @@ interface LiveConversation {
   channel: "whatsapp" | "messenger" | "instagram";
   incomingText: string;
   aiAutoReply: string;
-  status: "auto_replied" | "assessment_booked" | "needs_attention";
   timestamp: string;
   branch?: string;
 }
-
-const SAMPLE_LIVE_CONVERSATIONS: LiveConversation[] = [
-  {
-    id: "conv-1",
-    clientName: "أم خليفة",
-    clientHandle: "+971 50 *** 4128",
-    channel: "whatsapp",
-    incomingText: "السلام عليكم كابتن، ابني عمره 6 سنين ويخاف جداً من الماء، هل عندكم علاج للرهبة وكم سعر الاشتراك في فرع المشرف؟",
-    aiAutoReply: "وعليكم السلام ورحمة الله أهلاً بكِ أم خليفة في أكاديمية كابتن أيمن بأبوظبي. 🏊‍♂️💙 نحب نطمنك تماماً إن رهبة الماء طبيعية جداً في سن 6 سنوات، وكابتن أيمن متخصص في علاج الخوف والتأهيل التدريجي بأسلوب محبب ومطمئن وبدون أي ضغط. متوفر لدينا نوعين من التدريب: 1) تدريب خاص (VIP / فردي) لتركيز كامل وبناء الثقة خطوة بخطوة. 2) تدريب مجموعات صغيرة (4 أطفال فقط في المجموعة كحد أقصى) لضمان أعلى مستوى من الرعاية والأمان. واللي بيحدد الأنسب للبطل (خاص أم مجموعة) هو الكابتن أيمن بنفسه بعد ما تشرفونا في **جلسة تقييم أولي مجانية تماماً** في فرع المشرف للتعرف على المسبح بدون أي التزام مسبق. (رسوم الاشتراك بعد التقييم: باقة المجموعات 450 درهم شهرياً مع خصم الأخوة 400 درهم، والحصص الخاصة 150/250 درهم). هل تفضلين موعد التقييم فترة العصر أم المغرب؟",
-    status: "auto_replied",
-    timestamp: "منذ 18 دقيقة",
-    branch: "المشرف",
-  },
-  {
-    id: "conv-2",
-    clientName: "محمد المنصوري",
-    clientHandle: "m.me/almansoori.m",
-    channel: "messenger",
-    incomingText: "مرحبا كابتن، هل متوفر تدريب خاص للكبار لتصحيح تكنيك السباحة الحرة في فرع مدينة خليفة وبكم الحصة؟",
-    aiAutoReply: "مرحباً بك أستاذ محمد. نعم متوفر تدريب خاص فردي للكبار في فرع مدينة خليفة لرفع الكفاءة وتصحيح التكنيك (Total Immersion). الحصص الخاصة الفردية تبدأ من 150 درهم و250 درهم حسب البرنامج المخصص. يشرفنا حجز جلسة تقييم أولي مجانية لتحديد مستواك وجدولك المناسب. ما هو اليوم الأنسب لك للبدء؟",
-    status: "assessment_booked",
-    timestamp: "منذ 45 دقيقة",
-    branch: "مدينة خليفة",
-  },
-  {
-    id: "conv-3",
-    clientName: "سارة المهيري",
-    clientHandle: "@sarah.almehairi",
-    channel: "instagram",
-    incomingText: "السلام عليكم، حابة أسجل ولدين (8 و 10 سنين)، هل يوجد خصم إخوة؟ وما هي الفروع المتاحة؟",
-    aiAutoReply: "وعليكم السلام ورحمة الله أختي سارة. نعم نوفر خصم خاص للإخوة بقيمة 400 درهم لكل طفل بدلاً من 450 درهم. فروعنا المجهزة في أبوظبي: المشرف، الفلاح، مدينة خليفة، والدانة / النجدة. يسعدنا استقبالكم لجلسة تقييم مجانية للمستويات. أي فرع هو الأقرب لكم لتأكيد الأوقات؟",
-    status: "auto_replied",
-    timestamp: "منذ ساعتين",
-    branch: "الفلاح / المشرف",
-  },
-];
 
 const TEMPLATES = [
   {
@@ -71,36 +41,41 @@ const TEMPLATES = [
     id: "kids_group",
     titleAr: "مجموعات الأطفال (450 درهم)",
     titleEn: "Kids Groups (450 AED)",
-    textAr: "السلام عليكم كابتن أيمن، استفسار عن مواعيد وأماكن مجموعات الأطفال (باقة 450 درهم / خصم الإخوة 400 درهم).",
-    textEn: "Hello Coach Ayman, inquiring about kids group schedules (450 AED package / 400 AED sibling discount).",
+    textAr:
+      "السلام عليكم كابتن أيمن، استفسار عن مواعيد وأماكن مجموعات الأطفال (باقة 450 درهم / خصم الإخوة 400 درهم).",
+    textEn:
+      "Hello Coach Ayman, inquiring about kids group schedules (450 AED package / 400 AED sibling discount).",
   },
   {
     id: "aquaphobia",
     titleAr: "علاج رهبة الماء (حصص خاصة)",
     titleEn: "Aquaphobia Treatment",
-    textAr: "مرحباً كابتن، أرغب في الاستفسار عن الحصص الخاصة لعلاج الخوف من الماء وبناء الثقة للكبار أو الصغار (150/250 درهم).",
-    textEn: "Hi Coach, inquiring about private sessions for aquaphobia treatment and confidence building (150/250 AED).",
+    textAr:
+      "مرحباً كابتن، أرغب في الاستفسار عن الحصص الخاصة لعلاج الخوف من الماء وبناء الثقة للكبار أو الصغار (150/250 درهم).",
+    textEn:
+      "Hi Coach, inquiring about private sessions for aquaphobia treatment and confidence building (150/250 AED).",
   },
   {
     id: "branches",
     titleAr: "فروع مسابح أبوظبي",
     titleEn: "Abu Dhabi Branches",
     textAr: "مرحباً، ما هي أقرب مواعيد للحصص في فروعكم: المشرف، الفلاح، مدينة خليفة، أو الدانة؟",
-    textEn: "Hi, what are the upcoming session times at your branches: Al Mushrif, Al Falah, Khalifa City, or Al Danah?",
+    textEn:
+      "Hi, what are the upcoming session times at your branches: Al Mushrif, Al Falah, Khalifa City, or Al Danah?",
   },
 ];
 
 export function WhatsAppHub({ lang, log }: WhatsAppHubProps) {
   const isAr = lang === "ar";
-  const [autoPilotMode, setAutoPilotMode] = useState<"full_auto" | "alerts_only" | "manual">("manual");
-  const [conversations, setConversations] = useState<LiveConversation[]>(SAMPLE_LIVE_CONVERSATIONS);
-  const [selectedConv, setSelectedConv] = useState<LiveConversation | null>(null);
+  const conversations: LiveConversation[] = [];
 
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]!.id);
   const [customText, setCustomText] = useState(isAr ? TEMPLATES[0]!.textAr : TEMPLATES[0]!.textEn);
   const [clientQuery, setClientQuery] = useState("");
   const [aiSuggestedReply, setAiSuggestedReply] = useState("");
-  const [replyChannel, setReplyChannel] = useState<"whatsapp" | "messenger" | "instagram">("whatsapp");
+  const [replyChannel, setReplyChannel] = useState<"whatsapp" | "messenger" | "instagram">(
+    "whatsapp",
+  );
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedReply, setCopiedReply] = useState(false);
   const [generatingReply, setGeneratingReply] = useState(false);
@@ -152,8 +127,8 @@ export function WhatsAppHub({ lang, log }: WhatsAppHubProps) {
       replyChannel === "messenger"
         ? "المنصة المستهدفة: فيسبوك مسنجر (Facebook Messenger). اكتب رداً ودوداً ومباشراً يناسب شات فيسبوك."
         : replyChannel === "instagram"
-        ? "المنصة المستهدفة: إنستغرام دايركت (Instagram Direct). اكتب رداً جذاباً ومركزاً وسريعاً."
-        : "المنصة المستهدفة: واتساب (WhatsApp). اكتب رداً مفصلاً ومرتباً مع نقاط واضحة.";
+          ? "المنصة المستهدفة: إنستغرام دايركت (Instagram Direct). اكتب رداً جذاباً ومركزاً وسريعاً."
+          : "المنصة المستهدفة: واتساب (WhatsApp). اكتب رداً مفصلاً ومرتباً مع نقاط واضحة.";
 
     const prompt = `أنت المساعد الذكي لمبيعات وتأهيل السباحة لكابتن أيمن (Swimming & Relax Fix Hub أبوظبي).
 ${channelContext}
@@ -186,9 +161,17 @@ ${channelContext}
       if (!res.ok) throw new Error(await res.text());
       const reply = await res.text();
       setAiSuggestedReply(reply.trim());
-      log(isAr ? `تمت صياغة الرد لمنصة ${channelNames[replyChannel]} بواسطة كوتش براين` : "AI reply generated", "ok");
+      log(
+        isAr
+          ? `تمت صياغة الرد لمنصة ${channelNames[replyChannel]} بواسطة كوتش براين`
+          : "AI reply generated",
+        "ok",
+      );
     } catch (e) {
-      log(`${isAr ? "تعذر توليد الرد" : "Failed to generate reply"}: ${(e as Error).message}`, "err");
+      log(
+        `${isAr ? "تعذر توليد الرد" : "Failed to generate reply"}: ${(e as Error).message}`,
+        "err",
+      );
     } finally {
       setGeneratingReply(false);
     }
@@ -212,116 +195,89 @@ ${channelContext}
 
   return (
     <div className="space-y-4">
-      {/* 1. MASTER AUTOPILOT STATUS STRIP (Peace of mind for the owner) */}
-      <section className="glass space-y-4 p-4 border border-emerald-500/30 bg-emerald-950/10">
+      {/* 1. Honest integration status */}
+      <section className="glass space-y-4 border border-warning/30 bg-warning/5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="relative flex size-10 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
-              <Bot className="size-6" />
-              <span className="absolute -top-1 -right-1 size-3 rounded-full bg-emerald-400 animate-ping" />
-              <span className="absolute -top-1 -right-1 size-3 rounded-full bg-emerald-500" />
+            <div className="flex size-10 items-center justify-center rounded-xl bg-warning/15 text-warning">
+              <MessageCircle className="size-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-display text-sm tracking-wider text-emerald-400">
-                  {isAr ? "نظام الرد الآلي والطيار المستقل (AI Sales Concierge 24/7)" : "Autonomous AI Auto-Pilot (24/7)"}
+                <h2 className="font-display text-sm tracking-wider text-warning">
+                  {isAr
+                    ? "مركز الرسائل — الربط غير مفعّل"
+                    : "Messaging integrations are not connected"}
                 </h2>
-                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 font-mono text-[11px] text-emerald-400 font-bold">
-                  {isAr ? "مفعّل وشغال" : "ACTIVE"}
+                <span className="rounded-full bg-warning/15 px-2 py-0.5 font-mono text-[11px] text-warning font-bold">
+                  {isAr ? "يدوي فقط" : "Manual only"}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
                 {isAr
-                  ? "كوتش براين يتولى الرد الفوري المعتمد على استفسارات واتساب وفيسبوك وإنستغرام بدقة واحترافية"
-                  : "Coach Brain handles customer inquiries automatically across WhatsApp, Messenger & Instagram"}
+                  ? "لا يوجد صندوق وارد حي أو رد آلي متصل حالياً. يمكنك صياغة رد بمساعدة كوتش براين ثم مراجعته وفتحه يدوياً في التطبيق."
+                  : "No live inbox or automatic replies are connected. Draft a reply with Coach Brain, review it, then open the messaging app manually."}
               </p>
             </div>
           </div>
 
-          {/* Autopilot Mode Selector */}
-          <div className="flex items-center gap-1 rounded-lg border border-border bg-background/60 p-1 text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                setAutoPilotMode("full_auto");
-                log(isAr ? "تم تفعيل الرد الآلي الكامل 24/7" : "Auto-Pilot mode: Full Auto", "ok");
-              }}
-              className={`flex items-center gap-1.5 rounded px-3 py-1.5 font-semibold transition ${
-                autoPilotMode === "full_auto"
-                  ? "bg-emerald-600 text-white shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Zap className="size-3.5" />
-              {isAr ? "طيار آلي كامل 24/7" : "Full Auto 24/7"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAutoPilotMode("alerts_only");
-                log(isAr ? "وضع التنبيه عند الحاجة فقط" : "Auto-Pilot mode: Alerts Only", "info");
-              }}
-              className={`flex items-center gap-1.5 rounded px-3 py-1.5 font-medium transition ${
-                autoPilotMode === "alerts_only"
-                  ? "bg-amber-600 text-white shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <AlertTriangle className="size-3.5" />
-              {isAr ? "تنبيه للحالات الخاصة" : "Alerts Only"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAutoPilotMode("manual");
-                log(isAr ? "تم إيقاف الرد الآلي مؤقتاً" : "Auto-Pilot paused", "info");
-              }}
-              className={`rounded px-3 py-1.5 font-medium transition ${
-                autoPilotMode === "manual"
-                  ? "bg-secondary text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {isAr ? "يدوي مؤقتاً" : "Manual"}
-            </button>
-          </div>
+          <span className="rounded-lg border border-warning/30 px-3 py-2 text-xs text-warning">
+            {isAr
+              ? "يتطلب WhatsApp Business API وربط المنصات"
+              : "Requires WhatsApp Business API and platform setup"}
+          </span>
         </div>
 
         {/* Live Metrics Grid */}
         <div className="grid gap-3 sm:grid-cols-4 pt-1">
           <div className="rounded-lg border border-border bg-background/50 p-2.5">
-            <span className="text-[11px] text-muted-foreground">{isAr ? "حالة الرد التلقائي:" : "Auto-Reply Status:"}</span>
-            <div className="text-sm font-bold text-emerald-400 flex items-center gap-1 mt-0.5">
-              <CheckCircle2 className="size-4" />
-              {isAr ? "نشط (Webhook n8n متصل)" : "Active & Responding"}
+            <span className="text-[11px] text-muted-foreground">
+              {isAr ? "حالة الرد التلقائي:" : "Auto-Reply Status:"}
+            </span>
+            <div className="text-sm font-bold text-warning mt-0.5">
+              {isAr ? "غير مربوط" : "Not connected"}
             </div>
           </div>
           <div className="rounded-lg border border-border bg-background/50 p-2.5">
-            <span className="text-[11px] text-muted-foreground">{isAr ? "استفسارات اليوم المعالجة:" : "Today's Queries Handled:"}</span>
-            <div className="font-mono text-sm font-bold text-foreground mt-0.5">14 {isAr ? "محادثة" : "conversations"}</div>
+            <span className="text-[11px] text-muted-foreground">
+              {isAr ? "استفسارات اليوم المعالجة:" : "Today's Queries Handled:"}
+            </span>
+            <div className="font-mono text-sm font-bold text-foreground mt-0.5">
+              — {isAr ? "غير متاح" : "unavailable"}
+            </div>
           </div>
           <div className="rounded-lg border border-border bg-background/50 p-2.5">
-            <span className="text-[11px] text-muted-foreground">{isAr ? "حجوزات تقييم أولية مجانية:" : "Free Assessments Booked:"}</span>
-            <div className="font-mono text-sm font-bold text-accent mt-0.5">5 {isAr ? "أولياء أمور" : "leads"}</div>
+            <span className="text-[11px] text-muted-foreground">
+              {isAr ? "حجوزات تقييم أولية مجانية:" : "Free Assessments Booked:"}
+            </span>
+            <div className="font-mono text-sm font-bold text-accent mt-0.5">
+              — {isAr ? "غير متاح" : "unavailable"}
+            </div>
           </div>
           <div className="rounded-lg border border-border bg-background/50 p-2.5">
-            <span className="text-[11px] text-muted-foreground">{isAr ? "زمن الاستجابة التلقائي:" : "Avg Response Time:"}</span>
-            <div className="font-mono text-sm font-bold text-emerald-400 mt-0.5">&lt; 3 {isAr ? "ثوانٍ" : "sec"}</div>
+            <span className="text-[11px] text-muted-foreground">
+              {isAr ? "زمن الاستجابة التلقائي:" : "Avg Response Time:"}
+            </span>
+            <div className="font-mono text-sm font-bold text-emerald-400 mt-0.5">
+              — {isAr ? "غير متاح" : "unavailable"}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* 2. LIVE CONVERSATIONS STREAM (Look at your phone & be assured) */}
+      {/* 2. Live inbox placeholder */}
       <section className="glass space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Radio className="size-4 text-emerald-400 animate-pulse" />
+            <MessageCircle className="size-4 text-muted-foreground" />
             <h3 className="font-display text-sm tracking-wider text-primary">
-              {isAr ? "صندوق المحادثات والردود الآلية الحية (Live Inbound Stream)" : "Live Inbound AI Conversations"}
+              {isAr ? "صندوق الرسائل الواردة" : "Incoming message inbox"}
             </h3>
           </div>
           <span className="text-xs text-muted-foreground">
-            {isAr ? "مراقبة فورية للردود التي أرسلها الذكاء الاصطناعي للعملاء" : "Real-time feed of automated replies"}
+            {isAr
+              ? "غير متصل — لا توجد بيانات رسائل فعلية"
+              : "Not connected — no live message data"}
           </span>
         </div>
 
@@ -339,14 +295,20 @@ ${channelContext}
                       conv.channel === "whatsapp"
                         ? "bg-emerald-500/20 text-emerald-400"
                         : conv.channel === "messenger"
-                        ? "bg-blue-500/20 text-blue-400"
-                        : "bg-pink-500/20 text-pink-400"
+                          ? "bg-blue-500/20 text-blue-400"
+                          : "bg-pink-500/20 text-pink-400"
                     }`}
                   >
-                    {conv.channel === "whatsapp" ? "WhatsApp" : conv.channel === "messenger" ? "Messenger" : "Instagram"}
+                    {conv.channel === "whatsapp"
+                      ? "WhatsApp"
+                      : conv.channel === "messenger"
+                        ? "Messenger"
+                        : "Instagram"}
                   </span>
                   <span className="font-bold text-foreground">{conv.clientName}</span>
-                  <span dir="ltr" className="font-mono text-muted-foreground text-[11px]">{conv.clientHandle}</span>
+                  <span dir="ltr" className="font-mono text-muted-foreground text-[11px]">
+                    {conv.clientHandle}
+                  </span>
                   {conv.branch && (
                     <span className="rounded bg-secondary px-1.5 py-0.2 text-[10px] text-muted-foreground">
                       📍 {conv.branch}
@@ -366,11 +328,15 @@ ${channelContext}
               {/* Message Exchange */}
               <div className="space-y-1.5 text-xs">
                 <div className="rounded bg-secondary/50 p-2 text-foreground/90">
-                  <span className="font-semibold text-muted-foreground me-1">{isAr ? "العميل:" : "Client:"}</span>
+                  <span className="font-semibold text-muted-foreground me-1">
+                    {isAr ? "العميل:" : "Client:"}
+                  </span>
                   {conv.incomingText}
                 </div>
                 <div className="rounded border border-primary/20 bg-primary/5 p-2 text-foreground">
-                  <span className="font-semibold text-primary me-1">{isAr ? "رد كوتش براين التلقائي:" : "AI Reply:"}</span>
+                  <span className="font-semibold text-primary me-1">
+                    {isAr ? "رد كوتش براين التلقائي:" : "AI Reply:"}
+                  </span>
                   {conv.aiAutoReply}
                 </div>
               </div>
@@ -424,6 +390,13 @@ ${channelContext}
               </div>
             </div>
           ))}
+          {conversations.length === 0 && (
+            <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
+              {isAr
+                ? "لن تظهر هنا رسائل إلا بعد ربط WhatsApp Business API أو مصدر رسائل فعلي."
+                : "Messages will appear here only after connecting WhatsApp Business API or another live inbox."}
+            </p>
+          )}
         </div>
       </section>
 
@@ -440,8 +413,12 @@ ${channelContext}
             className="flex items-center justify-between rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-3 transition hover:border-emerald-500 hover:bg-emerald-900/30"
           >
             <div>
-              <div className="text-xs text-muted-foreground">{isAr ? "واتساب الحجوزات" : "WhatsApp"}</div>
-              <div dir="ltr" className="font-mono text-sm font-bold text-emerald-400">{phoneDisplay}</div>
+              <div className="text-xs text-muted-foreground">
+                {isAr ? "واتساب الحجوزات" : "WhatsApp"}
+              </div>
+              <div dir="ltr" className="font-mono text-sm font-bold text-emerald-400">
+                {phoneDisplay}
+              </div>
             </div>
             <ExternalLink className="size-4 text-emerald-400" />
           </a>
@@ -453,7 +430,9 @@ ${channelContext}
             className="flex items-center justify-between rounded-lg border border-blue-500/30 bg-blue-950/20 p-3 transition hover:border-blue-500 hover:bg-blue-900/30"
           >
             <div>
-              <div className="text-xs text-muted-foreground">{isAr ? "فيسبوك مسنجر" : "Messenger"}</div>
+              <div className="text-xs text-muted-foreground">
+                {isAr ? "فيسبوك مسنجر" : "Messenger"}
+              </div>
               <div className="text-xs font-semibold text-blue-400">m.me/{fbPageId}</div>
             </div>
             <ExternalLink className="size-4 text-blue-400" />
@@ -466,7 +445,9 @@ ${channelContext}
             className="flex items-center justify-between rounded-lg border border-pink-500/30 bg-pink-950/20 p-3 transition hover:border-pink-500 hover:bg-pink-900/30"
           >
             <div>
-              <div className="text-xs text-muted-foreground">{isAr ? "إنستغرام دايركت" : "Instagram DM"}</div>
+              <div className="text-xs text-muted-foreground">
+                {isAr ? "إنستغرام دايركت" : "Instagram DM"}
+              </div>
               <div className="text-xs font-semibold text-pink-400">@RelaxFixUAE</div>
             </div>
             <ExternalLink className="size-4 text-pink-400" />
@@ -477,8 +458,12 @@ ${channelContext}
             className="flex items-center justify-between rounded-lg border border-border bg-background/40 p-3 transition hover:border-primary hover:bg-secondary"
           >
             <div>
-              <div className="text-xs text-muted-foreground">{isAr ? "هاتف الإدارة (مكالمات)" : "Management Line"}</div>
-              <div dir="ltr" className="font-mono text-sm font-bold text-foreground">{mgmtPhoneDisplay}</div>
+              <div className="text-xs text-muted-foreground">
+                {isAr ? "هاتف الإدارة (مكالمات)" : "Management Line"}
+              </div>
+              <div dir="ltr" className="font-mono text-sm font-bold text-foreground">
+                {mgmtPhoneDisplay}
+              </div>
             </div>
             <Phone className="size-4 text-primary" />
           </a>
@@ -493,7 +478,9 @@ ${channelContext}
               {isAr ? "صياغة رد يدوي عند الطلب (Manual AI Draft)" : "Manual On-Demand AI Responder"}
             </h3>
             <p className="text-xs text-muted-foreground">
-              {isAr ? "إذا رغبت في تجربة استفسار معين وصياغة رد مخصص له في أي وقت:" : "Test any incoming inquiry and draft a tailored reply:"}
+              {isAr
+                ? "إذا رغبت في تجربة استفسار معين وصياغة رد مخصص له في أي وقت:"
+                : "Test any incoming inquiry and draft a tailored reply:"}
             </p>
           </div>
 
@@ -503,7 +490,9 @@ ${channelContext}
               type="button"
               onClick={() => setReplyChannel("whatsapp")}
               className={`rounded px-2.5 py-1 font-medium transition ${
-                replyChannel === "whatsapp" ? "bg-emerald-600 text-white shadow-sm" : "text-muted-foreground"
+                replyChannel === "whatsapp"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-muted-foreground"
               }`}
             >
               واتساب
@@ -512,7 +501,9 @@ ${channelContext}
               type="button"
               onClick={() => setReplyChannel("messenger")}
               className={`rounded px-2.5 py-1 font-medium transition ${
-                replyChannel === "messenger" ? "bg-blue-600 text-white shadow-sm" : "text-muted-foreground"
+                replyChannel === "messenger"
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-muted-foreground"
               }`}
             >
               مسنجر
@@ -521,7 +512,9 @@ ${channelContext}
               type="button"
               onClick={() => setReplyChannel("instagram")}
               className={`rounded px-2.5 py-1 font-medium transition ${
-                replyChannel === "instagram" ? "bg-pink-600 text-white shadow-sm" : "text-muted-foreground"
+                replyChannel === "instagram"
+                  ? "bg-pink-600 text-white shadow-sm"
+                  : "text-muted-foreground"
               }`}
             >
               إنستغرام
@@ -548,23 +541,37 @@ ${channelContext}
             className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
           >
             <Sparkles className={`size-4 ${generatingReply ? "animate-spin" : ""}`} />
-            {generatingReply ? (isAr ? "كوتش براين يصيغ الرد…" : "Thinking…") : (isAr ? "صياغة رد بواسطة كوتش براين" : "Draft Reply with AI")}
+            {generatingReply
+              ? isAr
+                ? "كوتش براين يصيغ الرد…"
+                : "Thinking…"
+              : isAr
+                ? "صياغة رد بواسطة كوتش براين"
+                : "Draft Reply with AI"}
           </button>
         </div>
 
         {aiSuggestedReply && (
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-primary">{isAr ? "الرد المقترح:" : "Suggested Reply:"}</span>
+              <span className="font-semibold text-primary">
+                {isAr ? "الرد المقترح:" : "Suggested Reply:"}
+              </span>
               <button
                 onClick={copyReply}
                 className="flex items-center gap-1 rounded border border-primary/40 px-2 py-1 text-xs hover:bg-primary/10"
               >
-                {copiedReply ? <Check className="size-3 text-accent" /> : <Copy className="size-3" />}
-                {copiedReply ? (isAr ? "تم النسخ!" : "Copied!") : (isAr ? "نسخ الرد" : "Copy Reply")}
+                {copiedReply ? (
+                  <Check className="size-3 text-accent" />
+                ) : (
+                  <Copy className="size-3" />
+                )}
+                {copiedReply ? (isAr ? "تم النسخ!" : "Copied!") : isAr ? "نسخ الرد" : "Copy Reply"}
               </button>
             </div>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{aiSuggestedReply}</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+              {aiSuggestedReply}
+            </p>
             <div className="flex flex-wrap gap-2 pt-1">
               {replyChannel === "whatsapp" && (
                 <a
@@ -574,7 +581,7 @@ ${channelContext}
                   className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 shadow-sm"
                 >
                   <Send className="size-3.5" />
-                  {isAr ? "إرسال عبر واتساب مباشرة" : "Send via WhatsApp"}
+                  {isAr ? "فتح واتساب بمسودة الرد" : "Open WhatsApp with draft"}
                 </a>
               )}
               {replyChannel === "messenger" && (
@@ -606,10 +613,14 @@ ${channelContext}
       <section className="glass space-y-4 p-4">
         <div>
           <h3 className="font-display text-sm tracking-wider text-primary">
-            {isAr ? "روابط الحملات الإعلانية الذكية (Lead Generation Links)" : "Smart Lead Generation Links"}
+            {isAr
+              ? "روابط الحملات الإعلانية الذكية (Lead Generation Links)"
+              : "Smart Lead Generation Links"}
           </h3>
           <p className="text-xs text-muted-foreground">
-            {isAr ? "روابط سريعة لوضعها في إعلانات فيسبوك وإنستغرام لتوجيه العميل مباشرة إلى الواتساب مع رسالة افتتاحية:" : "Quick links for ads to direct clients to WhatsApp with pre-filled text:"}
+            {isAr
+              ? "روابط سريعة لوضعها في إعلانات فيسبوك وإنستغرام لتوجيه العميل مباشرة إلى الواتساب مع رسالة افتتاحية:"
+              : "Quick links for ads to direct clients to WhatsApp with pre-filled text:"}
           </p>
         </div>
 
@@ -643,8 +654,12 @@ ${channelContext}
             onClick={copyLink}
             className="flex items-center gap-1.5 rounded-lg border border-border px-3.5 py-2 text-sm hover:bg-secondary"
           >
-            {copiedLink ? <Check className="size-4 text-emerald-400" /> : <Copy className="size-4" />}
-            {copiedLink ? (isAr ? "تم النسخ!" : "Copied!") : (isAr ? "نسخ رابط الحملة" : "Copy Link")}
+            {copiedLink ? (
+              <Check className="size-4 text-emerald-400" />
+            ) : (
+              <Copy className="size-4" />
+            )}
+            {copiedLink ? (isAr ? "تم النسخ!" : "Copied!") : isAr ? "نسخ رابط الحملة" : "Copy Link"}
           </button>
         </div>
       </section>

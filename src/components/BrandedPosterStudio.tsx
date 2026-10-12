@@ -26,31 +26,57 @@ export function BrandedPosterStudio({
   const [copiedBrief, setCopiedBrief] = useState(false);
 
   // Extract hook / headline from caption
-  const lines = caption.split("\n").map((l) => l.trim()).filter(Boolean);
-  const hook = lines[0] || (isAr ? "أكاديمية ريلاكس فيكس للسباحة — كوتش أيمن" : "Relax Fix Swimming Academy — Coach Ayman");
-  
+  const lines = caption
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const hook =
+    lines[0] ||
+    (isAr
+      ? "أكاديمية ريلاكس فيكس للسباحة — كوتش أيمن"
+      : "Relax Fix Swimming Academy — Coach Ayman");
+
   // Extract bullet points
   const bulletLines = lines
-    .filter((l) => l.startsWith("-") || l.startsWith("•") || l.startsWith("🔹") || l.startsWith("*") || /^\d+\)/.test(l))
+    .filter(
+      (l) =>
+        l.startsWith("-") ||
+        l.startsWith("•") ||
+        l.startsWith("🔹") ||
+        l.startsWith("*") ||
+        /^\d+\)/.test(l),
+    )
     .slice(0, 3)
-    .map((l) => l.replace(/^[-•🔹*\d\)]+\s*/, ""));
+    .map((l) => l.replace(/^(?:[-•🔹*]|\d+\))\s*/u, ""));
 
-  const keyPoints = bulletLines.length > 0 
-    ? bulletLines 
-    : [
-        isAr ? "تدريب خاص VIP ومجموعات بحد أقصى 4 أطفال" : "VIP Private & Small Groups (Strict Max 4 Kids)",
-        isAr ? "علاج رهبة الماء وتصحيح التكنيك تدريجياً" : "Gentle Aquaphobia & Technique Progression",
-        isAr ? "فروع أبوظبي: المشرف، الفلاح، مدينة خليفة، الدانة" : "Abu Dhabi Pools: Al Mushrif, Al Falah, Khalifa City, Al Danah",
-      ];
+  const keyPoints =
+    bulletLines.length > 0
+      ? bulletLines
+      : [
+          isAr
+            ? "تدريب خاص VIP ومجموعات بحد أقصى 4 أطفال"
+            : "VIP Private & Small Groups (Strict Max 4 Kids)",
+          isAr
+            ? "علاج رهبة الماء وتصحيح التكنيك تدريجياً"
+            : "Gentle Aquaphobia & Technique Progression",
+          isAr
+            ? "فروع أبوظبي: المشرف، الفلاح، مدينة خليفة، الدانة"
+            : "Abu Dhabi Pools: Al Mushrif, Al Falah, Khalifa City, Al Danah",
+        ];
 
-  const ratio = templateType === "drill" || templateType === "quiz" ? "9:16" : templateType === "branch_promo" ? "1:1" : "4:5";
+  const ratio =
+    templateType === "drill" || templateType === "quiz"
+      ? "9:16"
+      : templateType === "branch_promo"
+        ? "1:1"
+        : "4:5";
 
   const handleDownloadPng = async () => {
     setDownloading(true);
     try {
       const width = 1080;
       const height = ratio === "9:16" ? 1920 : ratio === "4:5" ? 1350 : 1080;
-      
+
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
@@ -69,7 +95,14 @@ export function BrandedPosterStudio({
       // 2. Water Wave Reflections / Ambient Glow
       ctx.save();
       ctx.globalAlpha = 0.15;
-      const glowGrad = ctx.createRadialGradient(width * 0.5, height * 0.3, 50, width * 0.5, height * 0.3, width * 0.6);
+      const glowGrad = ctx.createRadialGradient(
+        width * 0.5,
+        height * 0.3,
+        50,
+        width * 0.5,
+        height * 0.3,
+        width * 0.6,
+      );
       glowGrad.addColorStop(0, "#38bdf8");
       glowGrad.addColorStop(1, "transparent");
       ctx.fillStyle = glowGrad;
@@ -129,12 +162,26 @@ export function BrandedPosterStudio({
       ctx.lineCap = "round";
       ctx.beginPath();
       ctx.moveTo(width / 2 - 40, emblemCenterY + 10);
-      ctx.bezierCurveTo(width / 2 - 20, emblemCenterY + 25, width / 2 + 20, emblemCenterY - 5, width / 2 + 40, emblemCenterY + 10);
+      ctx.bezierCurveTo(
+        width / 2 - 20,
+        emblemCenterY + 25,
+        width / 2 + 20,
+        emblemCenterY - 5,
+        width / 2 + 40,
+        emblemCenterY + 10,
+      );
       ctx.stroke();
 
       ctx.beginPath();
       ctx.moveTo(width / 2 - 30, emblemCenterY + 28);
-      ctx.bezierCurveTo(width / 2 - 15, emblemCenterY + 40, width / 2 + 15, emblemCenterY + 15, width / 2 + 30, emblemCenterY + 28);
+      ctx.bezierCurveTo(
+        width / 2 - 15,
+        emblemCenterY + 40,
+        width / 2 + 15,
+        emblemCenterY + 15,
+        width / 2 + 30,
+        emblemCenterY + 28,
+      );
       ctx.stroke();
       ctx.restore();
 
@@ -167,12 +214,12 @@ export function BrandedPosterStudio({
         templateType === "drill"
           ? "🎯 تصحيح التكنيك وتطوير المهارات"
           : templateType === "transformation"
-          ? "🌟 علاج رهبة الماء وبناء الثقة"
-          : templateType === "branch_promo"
-          ? "📍 باقات فروع أبوظبي المعتمدة"
-          : "🏊‍♂️ تدريب سباحة احترافي في أبوظبي",
+            ? "🌟 علاج رهبة الماء وبناء الثقة"
+            : templateType === "branch_promo"
+              ? "📍 باقات فروع أبوظبي المعتمدة"
+              : "🏊‍♂️ تدريب سباحة احترافي في أبوظبي",
         width / 2,
-        badgeY + 30
+        badgeY + 30,
       );
       ctx.restore();
 
@@ -242,7 +289,11 @@ export function BrandedPosterStudio({
 
       ctx.font = "600 22px 'Cairo', 'Segoe UI', system-ui, sans-serif";
       ctx.fillStyle = "#e2e8f0";
-      ctx.fillText("المشرف  •  الفلاح  •  مدينة خليفة  •  الدانة / النجدة", width / 2, branchesY + 38);
+      ctx.fillText(
+        "المشرف  •  الفلاح  •  مدينة خليفة  •  الدانة / النجدة",
+        width / 2,
+        branchesY + 38,
+      );
 
       // 7. Bottom WhatsApp CTA Pill
       const ctaY = height - 150;
@@ -269,21 +320,41 @@ export function BrandedPosterStudio({
 
       // Convert to blob & trigger download
       canvas.toBlob((blob) => {
-        if (!blob) throw new Error("Could not create PNG blob");
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = blobUrl;
-        a.download = `RelaxFix-CoachAyman-${platform}-${templateType}-${Date.now().toString().slice(-4)}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
+        if (!blob) {
+          log(isAr ? "تعذر إنشاء ملف PNG للبوستر." : "Could not create the poster PNG.", "err");
+          setDownloading(false);
+          return;
+        }
+        try {
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = `RelaxFix-CoachAyman-${platform}-${templateType}-${Date.now().toString().slice(-4)}.png`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 
-        log(isAr ? "✅ تم تحميل بوستر الأكاديمية الرسمي بجودة عالية (1080px) بنجاح!" : "High-res branded poster downloaded!", "ok");
-        setDownloading(false);
+          log(
+            isAr
+              ? "✅ تم تحميل البوستر PNG بجودة عالية (1080px) بنجاح!"
+              : "High-res poster PNG downloaded!",
+            "ok",
+          );
+        } catch (error) {
+          log(
+            `${isAr ? "تعذر تحميل البوستر" : "Poster download failed"}: ${(error as Error).message}`,
+            "err",
+          );
+        } finally {
+          setDownloading(false);
+        }
       }, "image/png");
     } catch (err) {
-      log(`${isAr ? "تعذر إنشاء البوستر" : "Poster export failed"}: ${(err as Error).message}`, "err");
+      log(
+        `${isAr ? "تعذر إنشاء البوستر" : "Poster export failed"}: ${(err as Error).message}`,
+        "err",
+      );
       setDownloading(false);
     }
   };
@@ -325,7 +396,12 @@ Style: Shot on Sony A1, 50mm f/1.4 GM lens, crisp water droplets, shallow depth 
     await navigator.clipboard.writeText(promptText);
     setCopiedBrief(true);
     setTimeout(() => setCopiedBrief(false), 2000);
-    log(isAr ? "✨ تم نسخ برومبت Google Gemini الواقعي للحافظة!" : "Gemini photorealistic prompt copied!", "ok");
+    log(
+      isAr
+        ? "✨ تم نسخ برومبت Google Gemini الواقعي للحافظة!"
+        : "Gemini photorealistic prompt copied!",
+      "ok",
+    );
   };
 
   const openCanvaTool = () => {
@@ -339,7 +415,7 @@ Style: Shot on Sony A1, 50mm f/1.4 GM lens, crisp water droplets, shallow depth 
       isAr
         ? "🎨 تم نسخ مواصفات التصميم وفتح أداة Canva المخصصة للمقاس!"
         : "Design brief copied and Canva tool opened!",
-      "info"
+      "info",
     );
   };
 
@@ -350,7 +426,7 @@ Style: Shot on Sony A1, 50mm f/1.4 GM lens, crisp water droplets, shallow depth 
       isAr
         ? "✨ تم نسخ البرومبت وجارٍ فتح Google Gemini لتوليد الصورة!"
         : "Copied prompt and opening Google Gemini!",
-      "info"
+      "info",
     );
   };
 
@@ -364,13 +440,17 @@ Style: Shot on Sony A1, 50mm f/1.4 GM lens, crisp water droplets, shallow depth 
           </div>
           <div>
             <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
-              <span>{isAr ? "استوديو البوستر الرسمي والهوية" : "Official Branded Poster Studio"}</span>
+              <span>
+                {isAr ? "استوديو البوستر الرسمي والهوية" : "Official Branded Poster Studio"}
+              </span>
               <span className="text-[10px] bg-primary/20 text-primary border border-primary/30 px-1.5 py-0.2 rounded font-mono">
                 {ratio}
               </span>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              {isAr ? "تصميم معتمد بشعار Relax Fix وفروع أبوظبي ورقم الحجز الرسمي" : "Official Relax Fix logo, branches & WhatsApp badge"}
+              {isAr
+                ? "تصميم معتمد بشعار Relax Fix وفروع أبوظبي ورقم الحجز الرسمي"
+                : "Official Relax Fix logo, branches & WhatsApp badge"}
             </p>
           </div>
         </div>
@@ -414,12 +494,20 @@ Style: Shot on Sony A1, 50mm f/1.4 GM lens, crisp water droplets, shallow depth 
           <div className="text-right">
             <span className="inline-block rounded-full bg-cyan-500/20 border border-cyan-400/40 px-2.5 py-0.5 text-[10px] font-semibold text-cyan-200">
               {templateType === "drill"
-                ? (isAr ? "تصحيح تكنيك" : "Technique Drill")
+                ? isAr
+                  ? "تصحيح تكنيك"
+                  : "Technique Drill"
                 : templateType === "transformation"
-                ? (isAr ? "علاج رهبة الماء" : "Aquaphobia Program")
-                : templateType === "branch_promo"
-                ? (isAr ? "باقات فروع أبوظبي" : "Abu Dhabi Pools")
-                : (isAr ? "تدريب احترافي" : "Pro Training")}
+                  ? isAr
+                    ? "علاج رهبة الماء"
+                    : "Aquaphobia Program"
+                  : templateType === "branch_promo"
+                    ? isAr
+                      ? "باقات فروع أبوظبي"
+                      : "Abu Dhabi Pools"
+                    : isAr
+                      ? "تدريب احترافي"
+                      : "Pro Training"}
             </span>
           </div>
         </div>
@@ -445,7 +533,11 @@ Style: Shot on Sony A1, 50mm f/1.4 GM lens, crisp water droplets, shallow depth 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/10 text-[10px]">
           <div className="text-cyan-200 flex items-center gap-1">
             <span>📍</span>
-            <span>{isAr ? "المشرف · الفلاح · مدينة خليفة · الدانة" : "Al Mushrif · Al Falah · Khalifa · Al Danah"}</span>
+            <span>
+              {isAr
+                ? "المشرف · الفلاح · مدينة خليفة · الدانة"
+                : "Al Mushrif · Al Falah · Khalifa · Al Danah"}
+            </span>
           </div>
           <div className="rounded-full bg-emerald-600/90 px-2.5 py-0.5 font-bold text-white shadow">
             📲 058 821 9130 · {isAr ? "تقييم مجاني" : "Free Assessment"}
@@ -478,7 +570,11 @@ Style: Shot on Sony A1, 50mm f/1.4 GM lens, crisp water droplets, shallow depth 
           onClick={copyCanvaBrief}
           className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 hover:bg-secondary text-muted-foreground hover:text-foreground"
         >
-          {copiedBrief ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+          {copiedBrief ? (
+            <Check className="size-3 text-emerald-400" />
+          ) : (
+            <Copy className="size-3" />
+          )}
           <span>{isAr ? "نسخ مواصفات Canva" : "Copy Canva Spec"}</span>
         </button>
 
@@ -487,7 +583,11 @@ Style: Shot on Sony A1, 50mm f/1.4 GM lens, crisp water droplets, shallow depth 
           onClick={copyGeminiPrompt}
           className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 hover:bg-secondary text-muted-foreground hover:text-foreground"
         >
-          {copiedBrief ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+          {copiedBrief ? (
+            <Check className="size-3 text-emerald-400" />
+          ) : (
+            <Copy className="size-3" />
+          )}
           <span>{isAr ? "نسخ برومبت Gemini" : "Copy Gemini Prompt"}</span>
         </button>
       </div>
