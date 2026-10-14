@@ -130,18 +130,40 @@ export const Route = createFileRoute("/api/brain")({
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${lovableKey}`,
                 "Lovable-API-Key": lovableKey,
+                "X-Lovable-AIG-SDK": "fetch",
               },
               body: JSON.stringify({
-                model: "openai/gpt-4o",
-                stream: false,
+                model: "openai/gpt-6-astra",
+                stream: true,
+                store: false,
+                reasoning: { effort: "low" },
                 instructions: SYSTEM,
                 input: messages.map((m) => ({ role: m.role, content: m.content })),
               }),
             });
             if (!upstream.ok) console.error(`[brain] provider responded status=${upstream.status}`);
-            if (upstream.ok) {
-              const data = await upstream.json();
-              const reply = data.output_text || data.choices?.[0]?.message?.content;
+            if (upstream.ok && upstream.body) {
+              // Consume the SSE stream server-side and return the final text.
+              const reader = upstream.body.getReader();
+              const dec = new TextDecoder();
+              let buf = "";
+              let reply = "";
+              for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buf += dec.decode(value, { stream: true });
+                const lines = buf.split("\n");
+                buf = lines.pop() ?? "";
+                for (const line of lines) {
+                  if (!line.startsWith("data:")) continue;
+                  try {
+                    const ev = JSON.parse(line.slice(5).trim());
+                    if (ev.type === "response.output_text.delta" && ev.delta) reply += ev.delta;
+                  } catch {
+                    /* ignore keep-alive / partial lines */
+                  }
+                }
+              }
               if (reply) {
                 return new Response(reply, {
                   headers: { "Content-Type": "text/plain; charset=utf-8" },
