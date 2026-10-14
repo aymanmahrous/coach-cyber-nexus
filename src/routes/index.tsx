@@ -55,9 +55,12 @@ const T = {
       whatsapp: "واتساب",
       vault: "الوسائط",
     },
-    online: "متصل",
-    offline: "غير مربوط",
-    ready: "جاهز",
+    online: "متحقق",
+    offline: "غير مهيأ",
+    ready: "لم يُتحقق بعد",
+    configured: "مُهيأ / لم يُتحقق",
+    noCheck: "لا يوجد فحص",
+    checking: "جارٍ الفحص…",
     notif: "مركز الإشعارات",
     noNotif: "لا توجد أحداث بعد. كل حركة في النظام ستظهر هنا.",
     clear: "مسح",
@@ -128,9 +131,12 @@ const T = {
       whatsapp: "WhatsApp",
       vault: "Media Vault",
     },
-    online: "Online",
-    offline: "Not linked",
-    ready: "Ready",
+    online: "Verified",
+    offline: "Not configured",
+    ready: "Not verified yet",
+    configured: "Configured / unverified",
+    noCheck: "No check available",
+    checking: "Checking…",
     notif: "Notification Center",
     noNotif: "No events yet. Every system action appears here.",
     clear: "Clear",
@@ -232,12 +238,38 @@ function Cockpit() {
       ].slice(0, 50),
     );
 
-  const channels = [
-    { name: isAr ? "واتساب (058 821 9130)" : "WhatsApp", on: true },
-    { name: isAr ? "فيسبوك وماسنجر" : "Facebook & Messenger", on: true },
-    { name: isAr ? "إنستغرام (@RelaxFixUAE)" : "Instagram", on: true },
-    { name: isAr ? "Canva & Gemini AI" : "Canva & Gemini", on: true },
+  // Configuration status only (no live connection checks exist yet).
+  type Cfg = "checking" | "configured" | "off" | "nocheck";
+  const [cfg, setCfg] = useState<{ fb: Cfg; ig: Cfg; canva: Cfg }>({ fb: "checking", ig: "checking", canva: "checking" });
+  useEffect(() => {
+    let alive = true;
+    const map = (v: unknown): Cfg => (v === "configured_unverified" ? "configured" : v === "not_configured" ? "off" : "nocheck");
+    Promise.allSettled([
+      fetch("/api/publish").then((r) => (r.ok ? r.json() : Promise.reject())),
+      fetch("/api/canva").then((r) => (r.ok ? r.json() : Promise.reject())),
+    ]).then(([pub, cv]) => {
+      if (!alive) return;
+      const p = pub.status === "fulfilled" ? pub.value : null;
+      const c = cv.status === "fulfilled" ? cv.value : null;
+      setCfg({
+        fb: p ? map(p.facebook) : "nocheck",
+        ig: p ? map(p.instagram) : "nocheck",
+        canva: c ? (c.configured ? "configured" : "off") : "nocheck",
+      });
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const channels: { name: string; st: Cfg }[] = [
+    { name: isAr ? "واتساب" : "WhatsApp", st: "nocheck" },
+    { name: isAr ? "فيسبوك" : "Facebook", st: cfg.fb },
+    { name: isAr ? "إنستغرام" : "Instagram", st: cfg.ig },
+    { name: "TikTok", st: "nocheck" },
+    { name: "Canva", st: cfg.canva },
   ];
+  const cfgLabel = (st: Cfg) =>
+    st === "configured" ? t.configured : st === "off" ? t.offline : st === "checking" ? t.checking : t.noCheck;
 
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 p-3 md:p-6">
@@ -260,14 +292,14 @@ function Cockpit() {
               className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-muted-foreground"
             >
               <span
-                className={`size-2 rounded-full ${c.on ? "bg-accent" : "bg-muted-foreground/50"}`}
+                className={`size-2 rounded-full ${c.st === "configured" ? "bg-warning" : "bg-muted-foreground/50"}`}
               />
-              {c.name} · {c.on ? t.online : t.offline}
+              {c.name} · {cfgLabel(c.st)}
             </span>
           ))}
           <span className="flex items-center gap-1.5 rounded-full border border-primary/40 px-2.5 py-1 text-primary">
             <span
-              className={`size-2 rounded-full ${brainState === "err" ? "bg-destructive" : "animate-pulse bg-accent"}`}
+              className={`size-2 rounded-full ${brainState === "err" ? "bg-destructive" : brainState === "online" ? "bg-accent" : "bg-muted-foreground/50"}`}
             />
             Coach Brain ·{" "}
             {brainState === "online" ? t.online : brainState === "err" ? "ERR" : t.ready}
