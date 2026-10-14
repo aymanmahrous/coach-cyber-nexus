@@ -625,6 +625,7 @@ function EnhancedPostCard({
           platform: p.platform,
           caption: p.caption,
           imageUrl: imageUrl.trim(),
+          idempotencyKey: /^[A-Za-z0-9_-]{4,64}$/.test(p.id) ? p.id : undefined,
         }),
       });
       const data = await res.json();
@@ -640,14 +641,32 @@ function EnhancedPostCard({
             ? "حساب إنستغرام غير مربوط بعد"
             : "Instagram not linked yet",
           instagram_needs_image: isAr ? "إنستغرام يحتاج رابط صورة" : "Instagram needs an image",
+          invalid_image_url: isAr
+            ? "رابط الصورة يجب أن يكون https عاماً وصالحاً"
+            : "Image URL must be a valid public https link",
+          publish_pin_too_weak: isAr
+            ? "رمز المالك المضبوط قصير جداً (8 أحرف على الأقل)"
+            : "Configured owner PIN is too short (min 8)",
+          too_many_attempts: isAr
+            ? "محاولات خاطئة كثيرة، حاول لاحقاً"
+            : "Too many attempts, try later",
+          duplicate_request: isAr
+            ? "تم إرسال هذا المنشور للنشر بالفعل"
+            : "This post was already sent for publishing",
+          meta_auth_failed: isAr
+            ? "تعذر التحقق من صلاحية حساب Meta"
+            : "Meta account authorization failed",
+          meta_publish_failed: isAr
+            ? "تعذر النشر على Meta، لم يُنشر شيء"
+            : "Meta publish failed; nothing was posted",
         };
-        throw new Error(msgs[data.error] || data.message || data.error);
+        throw new Error(msgs[data.error] || (isAr ? "خطأ غير معروف" : "Unknown error"));
       }
       sessionStorage.setItem("owner-pin", pin);
       update(p.id, {
         status: "Published",
         publishedExternalId: data.id,
-        publishedExternalUrl: data.url,
+        publishedExternalUrl: data.url || undefined,
       } as Partial<Post>);
       log(
         isAr
