@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import crypto from "node:crypto";
 
-const CANVA_CLIENT_ID = (process.env["CANVA_CLIENT_ID"] || "OC-AaCRfP-VVcyS").trim();
+const CANVA_CLIENT_ID = (process.env["CANVA_CLIENT_ID"] || "").trim();
 const CANVA_CLIENT_SECRET = (process.env["CANVA_CLIENT_SECRET"] || "").trim();
-const CANVA_BRAND_TEMPLATE_ID = (process.env["CANVA_BRAND_TEMPLATE_ID"] || "EAHVAAahmjU").trim();
+const CANVA_BRAND_TEMPLATE_ID = (process.env["CANVA_BRAND_TEMPLATE_ID"] || "").trim();
 const CANVA_AUTH_URL = "https://www.canva.com/api/oauth/authorize";
 const CANVA_TOKEN_URL = "https://api.canva.com/rest/v1/oauth/token";
 const CANVA_SCOPES =
@@ -73,7 +73,7 @@ export const Route = createFileRoute("/api/canva")({
 
         // 1. Authorize: Redirect user to Canva OAuth consent screen
         if (action === "auth") {
-          if (!CANVA_CLIENT_SECRET) {
+          if (!CANVA_CLIENT_ID || !CANVA_CLIENT_SECRET) {
             return Response.redirect(`${url.origin}/?canva_status=not_configured`, 302);
           }
           const redirectUri = getRedirectUri(request);
@@ -99,13 +99,12 @@ export const Route = createFileRoute("/api/canva")({
           const code = url.searchParams.get("code");
           const state = url.searchParams.get("state") || "";
           const error = url.searchParams.get("error");
-          const errorDesc = url.searchParams.get("error_description");
-
+          
           const clientOrigin = url.origin;
 
           if (error) {
             const response = Response.redirect(
-              `${clientOrigin}/?canva_status=error&message=${encodeURIComponent(errorDesc || error)}`,
+              `${clientOrigin}/?canva_status=${error === "access_denied" ? "denied" : "error"}`,
               302,
             );
             if (state) clearOauthCookie(response, request, state);
@@ -149,10 +148,10 @@ export const Route = createFileRoute("/api/canva")({
             });
 
             if (!tokenRes.ok) {
-              const errBody = await tokenRes.text();
-              console.error("Canva token exchange failed:", tokenRes.status, errBody);
+              await tokenRes.body?.cancel().catch(() => {});
+              console.error(`[canva] token exchange failed status=${tokenRes.status}`);
               const response = Response.redirect(
-                `${clientOrigin}/?canva_status=exchange_failed&detail=${encodeURIComponent(errBody.slice(0, 100))}`,
+                `${clientOrigin}/?canva_status=exchange_failed`,
                 302,
               );
               clearOauthCookie(response, request, state);
@@ -188,9 +187,9 @@ export const Route = createFileRoute("/api/canva")({
             clearOauthCookie(response, request, state);
             return response;
           } catch (e) {
-            console.error("Canva callback error:", e);
+            console.error(`[canva] callback error: ${(e as Error)?.name || "Error"}`);
             const response = Response.redirect(
-              `${clientOrigin}/?canva_status=error&message=${encodeURIComponent((e as Error).message)}`,
+              `${clientOrigin}/?canva_status=error`,
               302,
             );
             clearOauthCookie(response, request, state);
@@ -202,9 +201,9 @@ export const Route = createFileRoute("/api/canva")({
         return new Response(
           JSON.stringify({
             configured: Boolean(CANVA_CLIENT_ID && CANVA_CLIENT_SECRET),
-            clientId: CANVA_CLIENT_ID,
-            brandTemplateId: CANVA_BRAND_TEMPLATE_ID,
-            connected: Boolean(savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now()),
+            brandTemplateConfigured: Boolean(CANVA_BRAND_TEMPLATE_ID),
+            // in-memory only, resets on restart (durable token storage = next phase)
+            connectedThisInstance: Boolean(savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now()),
           }),
           { headers: { "Content-Type": "application/json" } },
         );
@@ -215,7 +214,7 @@ export const Route = createFileRoute("/api/canva")({
         const redirectUri = getRedirectUri(request);
 
         if (body["action"] === "get_auth_url") {
-          if (!CANVA_CLIENT_SECRET) {
+          if (!CANVA_CLIENT_ID || !CANVA_CLIENT_SECRET) {
             return Response.json({ error: "canva_not_configured" }, { status: 503 });
           }
           const state = base64url(crypto.randomBytes(16));
@@ -245,9 +244,9 @@ export const Route = createFileRoute("/api/canva")({
         return new Response(
           JSON.stringify({
             configured: Boolean(CANVA_CLIENT_ID && CANVA_CLIENT_SECRET),
-            clientId: CANVA_CLIENT_ID,
-            brandTemplateId: CANVA_BRAND_TEMPLATE_ID,
-            connected: Boolean(savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now()),
+            brandTemplateConfigured: Boolean(CANVA_BRAND_TEMPLATE_ID),
+            // in-memory only, resets on restart (durable token storage = next phase)
+            connectedThisInstance: Boolean(savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now()),
           }),
           { headers: { "Content-Type": "application/json" } },
         );
