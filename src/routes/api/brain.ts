@@ -71,6 +71,7 @@ export const Route = createFileRoute("/api/brain")({
               }),
             });
 
+            if (!upstream.ok) console.error(`[brain] provider responded status=${upstream.status}`);
             if (upstream.ok) {
               const data = await upstream.json();
               const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -104,6 +105,7 @@ export const Route = createFileRoute("/api/brain")({
               }),
             });
 
+            if (!upstream.ok) console.error(`[brain] provider responded status=${upstream.status}`);
             if (upstream.ok) {
               const data = await upstream.json();
               const reply = data.choices?.[0]?.message?.content;
@@ -136,6 +138,7 @@ export const Route = createFileRoute("/api/brain")({
                 input: messages.map((m) => ({ role: m.role, content: m.content })),
               }),
             });
+            if (!upstream.ok) console.error(`[brain] provider responded status=${upstream.status}`);
             if (upstream.ok) {
               const data = await upstream.json();
               const reply = data.output_text || data.choices?.[0]?.message?.content;
