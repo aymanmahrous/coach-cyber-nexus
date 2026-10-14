@@ -5,7 +5,8 @@
 - [x] Content Factory (ported from new-coach-: templates, poster studio, review/approve)
 - [x] Imported WhatsApp Hub + Media Vault screens from new-coach- (auto-reply default set to manual)
 - [x] /api/publish: real Facebook/Instagram publishing behind owner PIN (code ready, NOT live)
-- [ ] REVIEW REPORTED TO OWNER — waiting for approval before any further execution
+- [x] Phase 1 Security & Truthful Status: publish/canva/brain hardening, honest status bar
+- [ ] Durable store for publish idempotency, PIN rate limiting, Canva tokens (needs Lovable Cloud)
 - [ ] Owner to supply Meta tokens + owner PIN (blocked: owner approval)
 - [ ] WhatsApp Hub shows sample conversations — replace with real inbox (needs WhatsApp Cloud API)
 - [ ] Canva route keeps login in server memory only — needs persistent storage (Lovable Cloud)
