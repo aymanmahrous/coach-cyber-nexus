@@ -1,0 +1,414 @@
+{
+  "meta": {
+    "name": "Coach Ayman's Command Center",
+    "package": "@ws-fazkk1v2rsar4rjz1fjw/d5ce83de-4d5c-4f7a-94e8-b5df6a443464",
+    "version": "1.0.0",
+    "framework": "react",
+    "css_framework": "tailwind",
+    "starter_template": "custom_design_system_tailwind",
+    "theme_files": [
+      "src/styles.css"
+    ],
+    "source_type": "local",
+    "source_manifest": {
+      "#enrichment": "51fe9eac24a6096001ebc5d5ddcb4b25a24fc7b06eacffa11963c38b54627a35",
+      ".gitignore": "6d9e901a692b46a83707c245fb03bc91",
+      ".lovable/project.json": "51a90576cd97762828b128ea584e5780",
+      ".prettierignore": "7279a476f196a2da5f7edd18db568dc6",
+      ".prettierrc": "185ef0234746ab738ac1ab6cec5e2bd9",
+      "AGENTS.md": "8ef449460e0c6a430c7eacf1fb57720c",
+      "README.md": "a0cb2a111811478cdefeb8d3313b1359",
+      "bunfig.toml": "89115995d9de72fdfc894e16b1e75297",
+      "components.json": "30d3d035361ce807021f5c54620962e9",
+      "eslint.config.js": "345bdd57e188e0e4525edcd00e5003f5",
+      "nitro.config.ts": "ffb783f551b4c33a927e2702f6ac24ca",
+      "package.json": "6eda10f7240ccbea06053b0f568782ef",
+      "public/favicon.ico": "9f504444f85a5af2eef9264b02ae40be",
+      "public/robots.txt": "f9dff89adf98833e676de2205921996a",
+      "roadmap.md": "711ff2c71fd546c25b2a20ced5ee67d6",
+      "src/components/BrandedPosterStudio.tsx": "9434a9c045a33ea4dd64118d3eb1578c",
+      "src/components/ContentFactory.tsx": "86ff55cbbfd6cedb7ffcb14804ffff1b",
+      "src/components/MediaVault.tsx": "703d07e994edfcea982cf4e22b154704",
+      "src/components/WhatsAppHub.tsx": "ea84f65f84fb51870232ece4c14bcc2d",
+      "src/components/ui/accordion.tsx": "55f9dda62b4e3913c9b23e5015a86aef",
+      "src/components/ui/alert-dialog.tsx": "96350e949e9b7b674545430a410ab89c",
+      "src/components/ui/alert.tsx": "f993d7e96b1e25ce50e68ed97e11d2a8",
+      "src/components/ui/aspect-ratio.tsx": "c5c364545e1b25a94e9e752cd67ad048",
+      "src/components/ui/avatar.tsx": "72989cd32f72c4122802540ef32525a5",
+      "src/components/ui/badge.tsx": "81cade001fc4260f9943e18dcd79449b",
+      "src/components/ui/breadcrumb.tsx": "bb9ac254f12662b20d5d50b84308bf3a",
+      "src/components/ui/button.tsx": "7d07d520f486b12bd47373d694ecd2ee",
+      "src/components/ui/calendar.tsx": "d849cc610e2683271f3f1c47d093cf30",
+      "src/components/ui/card.tsx": "d6c48ea36221b9cdc3576d305d12d5d5",
+      "src/components/ui/carousel.tsx": "e324c68ae00cd5aed49317638abd429a",
+      "src/components/ui/chart.tsx": "6a3baf94f2e89f1f97d4d7a28f3622d2",
+      "src/components/ui/checkbox.tsx": "f78aac270ca482c8c2cb907ef6260462",
+      "src/components/ui/collapsible.tsx": "767631bbc344945c236f185f4078d71d",
+      "src/components/ui/command.tsx": "014782599cc838b021ec68b07ad4ea02",
+      "src/components/ui/context-menu.tsx": "3ba8244ea23df34a1dba92f3a1230dad",
+      "src/components/ui/dialog.tsx": "ef4fe8e7de8675730afe3d633b260e09",
+      "src/components/ui/drawer.tsx": "8be333e8fd8e42576b1b5f72f07f4337",
+      "src/components/ui/dropdown-menu.tsx": "28d6e98d3c7811fc0514bfa69416f087",
+      "src/components/ui/form.tsx": "1b0aa6302b9017ea2a1307c22a1d2983",
+      "src/components/ui/hover-card.tsx": "1442794c5ca2a78d69e4e613b315ed3d",
+      "src/components/ui/input-otp.tsx": "65625f2f1c4d731a760aeed7b54459d1",
+      "src/components/ui/input.tsx": "1d4cc52a4cd8afb3e18e45bda942bb8a",
+      "src/components/ui/label.tsx": "7e35df4ca8edd0835efd97ca7937ef92",
+      "src/components/ui/menubar.tsx": "3c4121a1e78d3f424a7295381a8997d3",
+      "src/components/ui/navigation-menu.tsx": "e85351147a02b29577ff83d188b63c24",
+      "src/components/ui/pagination.tsx": "fac6cdbb4bbf78b273d85cd36d6cbb49",
+      "src/components/ui/popover.tsx": "f18aa1da2144f25ee60795c539c51bcd",
+      "src/components/ui/progress.tsx": "55c462e5c9dd678dcf2c0c510b014ac4",
+      "src/components/ui/radio-group.tsx": "0e1ace237a5da3197e3eb1e6683faba9",
+      "src/components/ui/resizable.tsx": "d9fcb9203c749fcab4e125a99bb12a86",
+      "src/components/ui/scroll-area.tsx": "87b65d3eb26f2b02ff35a7acea585ba5",
+      "src/components/ui/select.tsx": "31ea1bbd6671833b010b2e852c8a55d0",
+      "src/components/ui/separator.tsx": "433d163c4ffa00b59398a0c293198b5e",
+      "src/components/ui/sheet.tsx": "0221fbf97b69611b47fcbc10bb27669a",
+      "src/components/ui/sidebar.tsx": "83c1623eb50ebc370d7b1b84a542e369",
+      "src/components/ui/skeleton.tsx": "41b182e6e2fc3805960d41e767d4a972",
+      "src/components/ui/slider.tsx": "4752f1bfa26426988d325599e01c335b",
+      "src/components/ui/sonner.tsx": "97f59f60be3413196d095fcbf7383216",
+      "src/components/ui/switch.tsx": "82f5d8b0c59bb7ff305caa9f502e79ff",
+      "src/components/ui/table.tsx": "7cc889989d53894b659903c73aded96e",
+      "src/components/ui/tabs.tsx": "56e725558c2ce72c18243bf51717f385",
+      "src/components/ui/textarea.tsx": "c7aad96fb9545210d53135a96c76ed6b",
+      "src/components/ui/toggle-group.tsx": "ac26383acf721d116ca8e3ab5c5355d5",
+      "src/components/ui/toggle.tsx": "ee8c5adac74e7242b85b544db1a8fbad",
+      "src/components/ui/tooltip.tsx": "67d71db5a1ab935695d1def497f5b8a6",
+      "src/hooks/use-mobile.tsx": "c0a0bdd4638c391a1dd06ac82074e60b",
+      "src/lib/error-capture.ts": "f630d9686a9a989170f22eff4de7b30d",
+      "src/lib/error-page.ts": "8da0ddd7569bac2676b9a5c8edff8a36",
+      "src/lib/lovable-error-reporting.ts": "0367e03b7d71917510e4dc1cdae172ec",
+      "src/lib/posts.ts": "a07704d7a7fed1d27d7ca3f9b024e65f",
+      "src/lib/utils.ts": "d9837f38cc05303254571985e3164050",
+      "src/routeTree.gen.ts": "1b2733f28981d99a7cc9eddd9b37f96e",
+      "src/router.tsx": "8f905e713b0eba7fa8148b7995a708c9",
+      "src/routes/README.md": "0044790c298aeb33868a7525d79f1585",
+      "src/routes/__root.tsx": "25b1309ac5497184cb5491e43b934994",
+      "src/routes/api/brain.ts": "c5bd6bd62988cb509075c900759b82ec",
+      "src/routes/api/canva.ts": "46d23f8195965a5b63b2e595a87b9635",
+      "src/routes/api/publish.ts": "1ddc74f35d0856424c0c41289e1ef13c",
+      "src/routes/index.tsx": "39256195c94a00e2484b9219226e0bd2",
+      "src/server.ts": "c7bbc49bb70e318af618d92775ee0f27",
+      "src/start.ts": "0502f82c58afce5012b4c102e6fe2437",
+      "src/styles.css": "ad9cf5c4b5bebde45186d6462832d66b",
+      "tsconfig.json": "e84e5c7fe88e3c5a4d54f55a816d42c1",
+      "vite.config.ts": "d67e8217e5f31b87c276b6357c9aedcf"
+    },
+    "pipeline_version": 8
+  },
+  "tokens": {
+    "color": [
+      {
+        "name": "--background",
+        "raw": "oklch(0.14 0.03 250)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--foreground",
+        "raw": "oklch(0.95 0.02 220)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--card",
+        "raw": "oklch(0.2 0.04 245 / 0.55)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--card-foreground",
+        "raw": "oklch(0.95 0.02 220)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--popover",
+        "raw": "oklch(0.18 0.04 245)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--popover-foreground",
+        "raw": "oklch(0.95 0.02 220)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--primary",
+        "raw": "oklch(0.82 0.15 200)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--primary-foreground",
+        "raw": "oklch(0.15 0.03 250)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--secondary",
+        "raw": "oklch(0.26 0.05 245)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--secondary-foreground",
+        "raw": "oklch(0.95 0.02 220)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--muted",
+        "raw": "oklch(0.24 0.04 245)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--muted-foreground",
+        "raw": "oklch(0.7 0.04 230)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--accent",
+        "raw": "oklch(0.78 0.17 150)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--accent-foreground",
+        "raw": "oklch(0.15 0.03 250)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--warning",
+        "raw": "oklch(0.82 0.16 80)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--destructive",
+        "raw": "oklch(0.65 0.22 25)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--destructive-foreground",
+        "raw": "oklch(0.98 0 0)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--border",
+        "raw": "oklch(0.82 0.15 200 / 0.18)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--input",
+        "raw": "oklch(0.82 0.15 200 / 0.25)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--ring",
+        "raw": "oklch(0.82 0.15 200)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--chart-1",
+        "raw": "oklch(0.82 0.15 200)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--chart-2",
+        "raw": "oklch(0.78 0.17 150)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--chart-3",
+        "raw": "oklch(0.82 0.16 80)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--chart-4",
+        "raw": "oklch(0.7 0.2 320)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--chart-5",
+        "raw": "oklch(0.65 0.22 25)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar",
+        "raw": "oklch(0.17 0.035 248 / 0.7)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-foreground",
+        "raw": "oklch(0.95 0.02 220)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-primary",
+        "raw": "oklch(0.82 0.15 200)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-primary-foreground",
+        "raw": "oklch(0.15 0.03 250)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-accent",
+        "raw": "oklch(0.26 0.05 245)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-accent-foreground",
+        "raw": "oklch(0.95 0.02 220)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-border",
+        "raw": "oklch(0.82 0.15 200 / 0.18)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--sidebar-ring",
+        "raw": "oklch(0.82 0.15 200)",
+        "source": "src/styles.css"
+      }
+    ],
+    "typography": [
+      {
+        "name": "--font-display",
+        "raw": "\"Orbitron\", \"IBM Plex Sans Arabic\", sans-serif",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--font-sans",
+        "raw": "\"Space Grotesk\", \"IBM Plex Sans Arabic\", sans-serif",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--font-mono",
+        "raw": "\"JetBrains Mono\", monospace",
+        "source": "src/styles.css"
+      }
+    ],
+    "radius": [
+      {
+        "name": "--radius-sm",
+        "raw": "calc(var(--radius) - 4px)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--radius-md",
+        "raw": "calc(var(--radius) - 2px)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--radius-xl",
+        "raw": "calc(var(--radius) + 4px)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--radius-2xl",
+        "raw": "calc(var(--radius) + 8px)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--radius-3xl",
+        "raw": "calc(var(--radius) + 12px)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--radius-4xl",
+        "raw": "calc(var(--radius) + 16px)",
+        "source": "src/styles.css"
+      },
+      {
+        "name": "--radius",
+        "raw": "0.9rem",
+        "source": "src/styles.css"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "BrandedPosterStudio",
+      "file": "src/components/BrandedPosterStudio",
+      "import_path": "",
+      "props": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "caption",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "visual",
+          "type": "string"
+        },
+        {
+          "name": "platform",
+          "type": "any",
+          "required": true
+        },
+        {
+          "name": "templateType",
+          "type": "any",
+          "required": true
+        },
+        {
+          "name": "isAr",
+          "type": "boolean",
+          "required": true
+        },
+        {
+          "name": "log",
+          "type": "function",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "ContentFactory",
+      "file": "src/components/ContentFactory",
+      "import_path": ""
+    },
+    {
+      "name": "MediaVault",
+      "file": "src/components/MediaVault",
+      "import_path": "",
+      "props": [
+        {
+          "name": "lang",
+          "type": "enum",
+          "values": [
+            "ar",
+            "en"
+          ],
+          "required": true
+        },
+        {
+          "name": "log",
+          "type": "function",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "WhatsAppHub",
+      "file": "src/components/WhatsAppHub",
+      "import_path": "",
+      "props": [
+        {
+          "name": "lang",
+          "type": "enum",
+          "values": [
+            "ar",
+            "en"
+          ],
+          "required": true
+        },
+        {
+          "name": "log",
+          "type": "function",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
