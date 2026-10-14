@@ -99,7 +99,7 @@ export const Route = createFileRoute("/api/canva")({
           const code = url.searchParams.get("code");
           const state = url.searchParams.get("state") || "";
           const error = url.searchParams.get("error");
-          
+
           const clientOrigin = url.origin;
 
           if (error) {
@@ -188,10 +188,7 @@ export const Route = createFileRoute("/api/canva")({
             return response;
           } catch (e) {
             console.error(`[canva] callback error: ${(e as Error)?.name || "Error"}`);
-            const response = Response.redirect(
-              `${clientOrigin}/?canva_status=error`,
-              302,
-            );
+            const response = Response.redirect(`${clientOrigin}/?canva_status=error`, 302);
             clearOauthCookie(response, request, state);
             return response;
           }
@@ -203,7 +200,9 @@ export const Route = createFileRoute("/api/canva")({
             configured: Boolean(CANVA_CLIENT_ID && CANVA_CLIENT_SECRET),
             brandTemplateConfigured: Boolean(CANVA_BRAND_TEMPLATE_ID),
             // in-memory only, resets on restart (durable token storage = next phase)
-            connectedThisInstance: Boolean(savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now()),
+            connectedThisInstance: Boolean(
+              savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now(),
+            ),
           }),
           { headers: { "Content-Type": "application/json" } },
         );
@@ -246,7 +245,9 @@ export const Route = createFileRoute("/api/canva")({
             configured: Boolean(CANVA_CLIENT_ID && CANVA_CLIENT_SECRET),
             brandTemplateConfigured: Boolean(CANVA_BRAND_TEMPLATE_ID),
             // in-memory only, resets on restart (durable token storage = next phase)
-            connectedThisInstance: Boolean(savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now()),
+            connectedThisInstance: Boolean(
+              savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now(),
+            ),
           }),
           { headers: { "Content-Type": "application/json" } },
         );

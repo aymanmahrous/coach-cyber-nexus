@@ -87,7 +87,9 @@ function readConfig() {
   const igToken = env("INSTAGRAM_ACCESS_TOKEN");
   const igAccount = env("INSTAGRAM_ACCOUNT_ID");
   const pin = env("OWNER_PUBLISH_PIN");
-  const version = /^v\d+\.\d+$/.test(env("META_GRAPH_VERSION")) ? env("META_GRAPH_VERSION") : "v21.0";
+  const version = /^v\d+\.\d+$/.test(env("META_GRAPH_VERSION"))
+    ? env("META_GRAPH_VERSION")
+    : "v21.0";
   return {
     pin,
     pinValid: pin.length >= MIN_PIN_LENGTH,
@@ -99,7 +101,10 @@ function readConfig() {
 
 /** Strip anything token-like before logging. */
 function redact(s: string) {
-  return s.replace(/(access_token=)[^&\s"]+/gi, "$1[redacted]").replace(/EAA[A-Za-z0-9]{10,}/g, "[redacted]").slice(0, 300);
+  return s
+    .replace(/(access_token=)[^&\s"]+/gi, "$1[redacted]")
+    .replace(/EAA[A-Za-z0-9]{10,}/g, "[redacted]")
+    .slice(0, 300);
 }
 
 class MetaError extends Error {
@@ -146,7 +151,10 @@ export const Route = createFileRoute("/api/publish")({
           return json({ error: "too_many_attempts" }, 429);
         }
         if (!safeEqual(pin, c.pin)) {
-          const next = f && now - f.first < FAIL_WINDOW_MS ? { count: f.count + 1, first: f.first } : { count: 1, first: now };
+          const next =
+            f && now - f.first < FAIL_WINDOW_MS
+              ? { count: f.count + 1, first: f.first }
+              : { count: 1, first: now };
           failures.set(who, next);
           await sleep(FAIL_DELAY_MS);
           return json({ error: "wrong_pin" }, 401);
@@ -155,12 +163,15 @@ export const Route = createFileRoute("/api/publish")({
 
         const target = platform === "facebook" ? c.facebook : c.instagram;
         if (!target) return json({ error: `${platform}_not_configured` }, 503);
-        if (platform === "instagram" && !imageUrl) return json({ error: "instagram_needs_image" }, 400);
+        if (platform === "instagram" && !imageUrl)
+          return json({ error: "instagram_needs_image" }, 400);
 
         // Best-effort duplicate guard (not durable).
-        for (const [k, t] of recentPublishes) if (now - t > DEDUPE_TTL_MS) recentPublishes.delete(k);
+        for (const [k, t] of recentPublishes)
+          if (now - t > DEDUPE_TTL_MS) recentPublishes.delete(k);
         const dedupeKey = idempotencyKey ? `${platform}:${idempotencyKey}` : null;
-        if (dedupeKey && recentPublishes.has(dedupeKey)) return json({ error: "duplicate_request" }, 409);
+        if (dedupeKey && recentPublishes.has(dedupeKey))
+          return json({ error: "duplicate_request" }, 409);
         if (dedupeKey) recentPublishes.set(dedupeKey, now);
 
         const G = `https://graph.facebook.com/${c.version}`;
@@ -191,15 +202,20 @@ export const Route = createFileRoute("/api/publish")({
             return json({ ok: true, id, url: id ? `https://www.facebook.com/${id}` : null });
           }
           const container = await call(`${target.id}/media`, { image_url: imageUrl, caption });
-          const pub = await call(`${target.id}/media_publish`, { creation_id: String(container["id"]) });
+          const pub = await call(`${target.id}/media_publish`, {
+            creation_id: String(container["id"]),
+          });
           return json({ ok: true, id: String(pub["id"] || ""), url: null });
         } catch (e) {
           if (dedupeKey) recentPublishes.delete(dedupeKey); // allow a deliberate retry after a failure
           if (e instanceof MetaError) {
-            const authProblem = e.status === 401 || e.metaCode === 190 || e.metaCode === 10 || e.metaCode === 200;
+            const authProblem =
+              e.status === 401 || e.metaCode === 190 || e.metaCode === 10 || e.metaCode === 200;
             return json({ error: authProblem ? "meta_auth_failed" : "meta_publish_failed" }, 502);
           }
-          console.error(`[publish] unexpected ${platform} error: ${redact(String((e as Error)?.name || "Error"))}`);
+          console.error(
+            `[publish] unexpected ${platform} error: ${redact(String((e as Error)?.name || "Error"))}`,
+          );
           return json({ error: "meta_publish_failed" }, 502);
         }
       },

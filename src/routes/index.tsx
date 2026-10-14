@@ -240,10 +240,15 @@ function Cockpit() {
 
   // Configuration status only (no live connection checks exist yet).
   type Cfg = "checking" | "configured" | "off" | "nocheck";
-  const [cfg, setCfg] = useState<{ fb: Cfg; ig: Cfg; canva: Cfg }>({ fb: "checking", ig: "checking", canva: "checking" });
+  const [cfg, setCfg] = useState<{ fb: Cfg; ig: Cfg; canva: Cfg }>({
+    fb: "checking",
+    ig: "checking",
+    canva: "checking",
+  });
   useEffect(() => {
     let alive = true;
-    const map = (v: unknown): Cfg => (v === "configured_unverified" ? "configured" : v === "not_configured" ? "off" : "nocheck");
+    const map = (v: unknown): Cfg =>
+      v === "configured_unverified" ? "configured" : v === "not_configured" ? "off" : "nocheck";
     Promise.allSettled([
       fetch("/api/publish").then((r) => (r.ok ? r.json() : Promise.reject())),
       fetch("/api/canva").then((r) => (r.ok ? r.json() : Promise.reject())),
@@ -269,7 +274,13 @@ function Cockpit() {
     { name: "Canva", st: cfg.canva },
   ];
   const cfgLabel = (st: Cfg) =>
-    st === "configured" ? t.configured : st === "off" ? t.offline : st === "checking" ? t.checking : t.noCheck;
+    st === "configured"
+      ? t.configured
+      : st === "off"
+        ? t.offline
+        : st === "checking"
+          ? t.checking
+          : t.noCheck;
 
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 p-3 md:p-6">
