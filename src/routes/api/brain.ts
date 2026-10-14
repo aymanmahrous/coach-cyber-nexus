@@ -29,11 +29,21 @@ Core Identity & Knowledge:
    - Never claim you published or charged money without the owner's manual approval. Zero fake actions.
    - Never invent customer testimonials, results, schedules, limited availability, facility/safety claims, or connected integrations. If a detail is unknown, say so and ask the owner to confirm it.`;
 
+const CHANNEL_INSTRUCTIONS: Record<string, string> = {
+  whatsapp:
+    "\n\n[Channel Directives: WhatsApp]\n- Format with clear, friendly, and structured bullet points.\n- Highlight the 100% Free Initial Assessment.\n- Mention official WhatsApp booking at 058 821 9130.",
+  messenger:
+    "\n\n[Channel Directives: Facebook Messenger]\n- Warm, conversational, direct tone suited for Facebook Page chat.\n- Encourage booking a free swimming assessment without pressure.",
+  instagram:
+    "\n\n[Channel Directives: Instagram Direct]\n- Engaging, energetic, and concise (max 2-3 short paragraphs).\n- Focus on child safety and technique development.",
+};
+
 const Body = z.object({
   messages: z
     .array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().min(1).max(8000) }))
     .min(1)
     .max(40),
+  channel: z.enum(["whatsapp", "messenger", "instagram"]).optional(),
 });
 
 export const Route = createFileRoute("/api/brain")({
@@ -43,7 +53,10 @@ export const Route = createFileRoute("/api/brain")({
         const parsed = Body.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return new Response("Invalid request payload", { status: 400 });
 
-        const messages = parsed.data.messages;
+        const { messages, channel } = parsed.data;
+        const systemPrompt = channel && CHANNEL_INSTRUCTIONS[channel]
+          ? SYSTEM + CHANNEL_INSTRUCTIONS[channel]
+          : SYSTEM;
 
         const geminiKey = process.env["GEMINI_API_KEY"] || process.env["GOOGLE_API_KEY"];
         const openaiKey = process.env["OPENAI_API_KEY"];
@@ -57,28 +70,36 @@ export const Route = createFileRoute("/api/brain")({
               parts: [{ text: m.content }],
             }));
 
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
-            const upstream = await fetch(url, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "x-goog-api-key": geminiKey },
-              body: JSON.stringify({
-                systemInstruction: { parts: [{ text: SYSTEM }] },
-                contents,
-                generationConfig: {
-                  temperature: 0.7,
-                  maxOutputTokens: 2048,
-                },
-              }),
-            });
+            // Use official supported model gemini-2.0-flash with fallback to gemini-1.5-flash
+            const primaryModel = process.env["GEMINI_MODEL"] || "gemini-2.0-flash";
+            const candidateModels = [primaryModel, "gemini-1.5-flash"];
 
-            if (!upstream.ok) console.error(`[brain] provider responded status=${upstream.status}`);
-            if (upstream.ok) {
-              const data = await upstream.json();
-              const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
-              if (reply) {
-                return new Response(reply, {
-                  headers: { "Content-Type": "text/plain; charset=utf-8" },
-                });
+            for (const model of candidateModels) {
+              const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+              const upstream = await fetch(url, {
+                method: "POST",
+                signal: AbortSignal.timeout(15_000),
+                headers: { "Content-Type": "application/json", "x-goog-api-key": geminiKey },
+                body: JSON.stringify({
+                  systemInstruction: { parts: [{ text: systemPrompt }] },
+                  contents,
+                  generationConfig: {
+                    temperature: 0.7,
+                    maxOutputTokens: 2048,
+                  },
+                }),
+              });
+
+              if (upstream.ok) {
+                const data = await upstream.json();
+                const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (reply) {
+                  return new Response(reply, {
+                    headers: { "Content-Type": "text/plain; charset=utf-8" },
+                  });
+                }
+              } else {
+                console.error(`[brain] Gemini model ${model} responded status=${upstream.status}`);
               }
             }
           } catch (e) {
@@ -91,6 +112,7 @@ export const Route = createFileRoute("/api/brain")({
           try {
             const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
               method: "POST",
+              signal: AbortSignal.timeout(15_000),
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${openaiKey}`,
@@ -98,7 +120,7 @@ export const Route = createFileRoute("/api/brain")({
               body: JSON.stringify({
                 model: "gpt-4o-mini",
                 messages: [
-                  { role: "system", content: SYSTEM },
+                  { role: "system", content: systemPrompt },
                   ...messages.map((m) => ({ role: m.role, content: m.content })),
                 ],
                 temperature: 0.7,
@@ -137,13 +159,12 @@ export const Route = createFileRoute("/api/brain")({
                 stream: true,
                 store: false,
                 reasoning: { effort: "low" },
-                instructions: SYSTEM,
+                instructions: systemPrompt,
                 input: messages.map((m) => ({ role: m.role, content: m.content })),
               }),
             });
             if (!upstream.ok) console.error(`[brain] provider responded status=${upstream.status}`);
             if (upstream.ok && upstream.body) {
-              // Consume the SSE stream server-side and return the final text.
               const reader = upstream.body.getReader();
               const dec = new TextDecoder();
               let buf = "";

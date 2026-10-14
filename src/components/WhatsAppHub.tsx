@@ -155,7 +155,7 @@ ${channelContext}
       const res = await fetch("/api/brain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [{ role: "user", content: prompt }] }),
+        body: JSON.stringify({ messages: [{ role: "user", content: prompt }], channel: replyChannel }),
       });
 
       if (!res.ok) throw new Error(await res.text());

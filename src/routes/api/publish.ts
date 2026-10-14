@@ -86,6 +86,7 @@ function readConfig() {
   const fbPage = env("FACEBOOK_PAGE_ID");
   const igToken = env("INSTAGRAM_ACCESS_TOKEN");
   const igAccount = env("INSTAGRAM_ACCOUNT_ID");
+  const webhookToken = env("META_WEBHOOK_VERIFY_TOKEN");
   const pin = env("OWNER_PUBLISH_PIN");
   const version = /^v\d+\.\d+$/.test(env("META_GRAPH_VERSION"))
     ? env("META_GRAPH_VERSION")
@@ -96,6 +97,7 @@ function readConfig() {
     version,
     facebook: fbToken && fbPage ? { token: fbToken, id: fbPage } : null,
     instagram: igToken && igAccount ? { token: igToken, id: igAccount } : null,
+    webhook: Boolean(webhookToken),
   };
 }
 
@@ -127,6 +129,7 @@ export const Route = createFileRoute("/api/publish")({
           ownerPin: c.pin ? (c.pinValid ? "configured" : "too_short") : "not_configured",
           facebook: st(!!c.facebook),
           instagram: st(!!c.instagram),
+          webhook: st(c.webhook),
         });
       },
 
@@ -163,6 +166,7 @@ export const Route = createFileRoute("/api/publish")({
 
         const target = platform === "facebook" ? c.facebook : c.instagram;
         if (!target) return json({ error: `${platform}_not_configured` }, 503);
+
         if (platform === "instagram" && !imageUrl)
           return json({ error: "instagram_needs_image" }, 400);
 
@@ -178,6 +182,7 @@ export const Route = createFileRoute("/api/publish")({
         const call = async (path: string, params: Record<string, string>) => {
           const res = await fetch(`${G}/${path}`, {
             method: "POST",
+            signal: AbortSignal.timeout(15_000),
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({ ...params, access_token: target.token }),
           });
