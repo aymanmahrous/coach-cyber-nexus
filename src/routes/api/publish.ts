@@ -1,3 +1,4 @@
+import { timingSafeEqualStr, getClientIp } from "../../lib/security.ts";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
@@ -86,6 +87,7 @@ function readConfig() {
   const fbPage = env("FACEBOOK_PAGE_ID");
   const igToken = env("INSTAGRAM_ACCESS_TOKEN");
   const igAccount = env("INSTAGRAM_ACCOUNT_ID");
+  const webhookToken = env("META_WEBHOOK_VERIFY_TOKEN");
   const pin = env("OWNER_PUBLISH_PIN");
   const version = /^v\d+\.\d+$/.test(env("META_GRAPH_VERSION"))
     ? env("META_GRAPH_VERSION")
@@ -96,6 +98,7 @@ function readConfig() {
     version,
     facebook: fbToken && fbPage ? { token: fbToken, id: fbPage } : null,
     instagram: igToken && igAccount ? { token: igToken, id: igAccount } : null,
+    webhook: Boolean(webhookToken && env("META_APP_SECRET")),
   };
 }
 
@@ -127,6 +130,7 @@ export const Route = createFileRoute("/api/publish")({
           ownerPin: c.pin ? (c.pinValid ? "configured" : "too_short") : "not_configured",
           facebook: st(!!c.facebook),
           instagram: st(!!c.instagram),
+          webhook: st(c.webhook),
         });
       },
 
@@ -143,14 +147,14 @@ export const Route = createFileRoute("/api/publish")({
         if (!c.pinValid) return json({ error: "publish_pin_too_weak" }, 503);
 
         // Best-effort lockout (per worker instance) + fixed delay on failure.
-        const who = clientKey(request);
+        const who = getClientIp(request);
         const now = Date.now();
         const f = failures.get(who);
         if (f && now - f.first < FAIL_WINDOW_MS && f.count >= MAX_FAILS) {
           await sleep(FAIL_DELAY_MS);
           return json({ error: "too_many_attempts" }, 429);
         }
-        if (!safeEqual(pin, c.pin)) {
+        if (!timingSafeEqualStr(pin, c.pin)) {
           const next =
             f && now - f.first < FAIL_WINDOW_MS
               ? { count: f.count + 1, first: f.first }
@@ -163,6 +167,7 @@ export const Route = createFileRoute("/api/publish")({
 
         const target = platform === "facebook" ? c.facebook : c.instagram;
         if (!target) return json({ error: `${platform}_not_configured` }, 503);
+
         if (platform === "instagram" && !imageUrl)
           return json({ error: "instagram_needs_image" }, 400);
 
@@ -178,6 +183,7 @@ export const Route = createFileRoute("/api/publish")({
         const call = async (path: string, params: Record<string, string>) => {
           const res = await fetch(`${G}/${path}`, {
             method: "POST",
+            signal: AbortSignal.timeout(15_000),
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({ ...params, access_token: target.token }),
           });
