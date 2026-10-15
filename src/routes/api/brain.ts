@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { withTimeout } from "@/lib/integration-guards";
+
+const PROVIDER_TIMEOUT_MS = 30_000;
+const GATEWAY_TIMEOUT_MS = 60_000;
 
 const SYSTEM = `You are "Coach Brain", the expert AI advisor, head swimming coach, and operating sales engine for Coach Ayman Swimming & Relax Fix Hub in Abu Dhabi.
 Reply in the user's language (Arabic by default, or English if asked). Be concise, practical, authoritative, and structured with markdown.
@@ -60,6 +64,7 @@ export const Route = createFileRoute("/api/brain")({
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
             const upstream = await fetch(url, {
               method: "POST",
+              signal: withTimeout(PROVIDER_TIMEOUT_MS, request.signal),
               headers: { "Content-Type": "application/json", "x-goog-api-key": geminiKey },
               body: JSON.stringify({
                 systemInstruction: { parts: [{ text: SYSTEM }] },
@@ -91,6 +96,7 @@ export const Route = createFileRoute("/api/brain")({
           try {
             const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
               method: "POST",
+              signal: withTimeout(PROVIDER_TIMEOUT_MS, request.signal),
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${openaiKey}`,
@@ -125,7 +131,7 @@ export const Route = createFileRoute("/api/brain")({
           try {
             const upstream = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
               method: "POST",
-              signal: request.signal,
+              signal: withTimeout(GATEWAY_TIMEOUT_MS, request.signal),
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${lovableKey}`,
