@@ -24,11 +24,7 @@ export function isSafeImageUrl(raw: string): boolean {
 }
 
 export type IntegrationStatus =
-  | "verified"
-  | "configured_unverified"
-  | "needs_setup"
-  | "blocked"
-  | "limited";
+  "verified" | "configured_unverified" | "needs_setup" | "blocked" | "limited";
 
 /** Canva: a token held only in one worker's memory is "limited", never "verified". */
 export function canvaStatus(data: unknown): IntegrationStatus {

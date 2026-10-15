@@ -200,6 +200,7 @@ export const Route = createFileRoute("/api/canva")({
           JSON.stringify({
             configured: Boolean(CANVA_CLIENT_ID && CANVA_CLIENT_SECRET),
             brandTemplateConfigured: Boolean(CANVA_BRAND_TEMPLATE_ID),
+            brandTemplateId: CANVA_BRAND_TEMPLATE_ID, // non-secret design template ID
             // in-memory only, resets on restart (durable token storage = next phase)
             connectedThisInstance: Boolean(
               savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now(),
@@ -245,6 +246,7 @@ export const Route = createFileRoute("/api/canva")({
           JSON.stringify({
             configured: Boolean(CANVA_CLIENT_ID && CANVA_CLIENT_SECRET),
             brandTemplateConfigured: Boolean(CANVA_BRAND_TEMPLATE_ID),
+            brandTemplateId: CANVA_BRAND_TEMPLATE_ID, // non-secret design template ID
             // in-memory only, resets on restart (durable token storage = next phase)
             connectedThisInstance: Boolean(
               savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now(),
