@@ -64,6 +64,7 @@ export const Route = createFileRoute("/api/brain")({
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
             const upstream = await fetch(url, {
               method: "POST",
+              signal: withTimeout(PROVIDER_TIMEOUT_MS, request.signal),
               headers: { "Content-Type": "application/json", "x-goog-api-key": geminiKey },
               body: JSON.stringify({
                 systemInstruction: { parts: [{ text: SYSTEM }] },
@@ -95,6 +96,7 @@ export const Route = createFileRoute("/api/brain")({
           try {
             const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
               method: "POST",
+              signal: withTimeout(PROVIDER_TIMEOUT_MS, request.signal),
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${openaiKey}`,
@@ -129,7 +131,7 @@ export const Route = createFileRoute("/api/brain")({
           try {
             const upstream = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
               method: "POST",
-              signal: request.signal,
+              signal: withTimeout(GATEWAY_TIMEOUT_MS, request.signal),
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${lovableKey}`,
