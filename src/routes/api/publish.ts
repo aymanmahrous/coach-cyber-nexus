@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { isSafeImageUrl, withTimeout } from "@/lib/integration-guards";
 
 /**
  * Owner-approved publishing to Meta (Facebook Page / Instagram Business).
@@ -22,26 +23,7 @@ const DEDUPE_TTL_MS = 24 * 60 * 60 * 1000;
 const failures = new Map<string, { count: number; first: number }>();
 const recentPublishes = new Map<string, number>();
 
-function isSafeImageUrl(raw: string): boolean {
-  let u: URL;
-  try {
-    u = new URL(raw);
-  } catch {
-    return false;
-  }
-  if (u.protocol !== "https:" || u.username || u.password) return false;
-  const h = u.hostname.toLowerCase();
-  if (
-    h === "localhost" ||
-    h.endsWith(".localhost") ||
-    h.endsWith(".internal") ||
-    h.endsWith(".local") ||
-    /^\d{1,3}(\.\d{1,3}){3}$/.test(h) ||
-    h.includes(":")
-  )
-    return false;
-  return true;
-}
+const META_TIMEOUT_MS = 20_000;
 
 const Body = z.object({
   pin: z.string().min(1).max(128),
