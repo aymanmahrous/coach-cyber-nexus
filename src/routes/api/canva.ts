@@ -145,6 +145,7 @@ export const Route = createFileRoute("/api/canva")({
                 "Content-Type": "application/x-www-form-urlencoded",
               },
               body: tokenParams.toString(),
+              signal: AbortSignal.timeout(15_000),
             });
 
             if (!tokenRes.ok) {

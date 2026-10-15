@@ -162,6 +162,7 @@ export const Route = createFileRoute("/api/publish")({
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({ ...params, access_token: target.token }),
+            signal: withTimeout(META_TIMEOUT_MS),
           });
           const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & {
             error?: { code?: number; type?: string; message?: string };
@@ -189,7 +190,10 @@ export const Route = createFileRoute("/api/publish")({
           });
           return json({ ok: true, id: String(pub["id"] || ""), url: null });
         } catch (e) {
-          if (dedupeKey) recentPublishes.delete(dedupeKey); // allow a deliberate retry after a failure
+          // On timeout Meta may still have published: keep the dedupe key so an
+          // immediate retry cannot double-post. Other failures allow a deliberate retry.
+          const timedOut = (e as Error)?.name === "TimeoutError";
+          if (dedupeKey && !timedOut) recentPublishes.delete(dedupeKey);
           if (e instanceof MetaError) {
             const authProblem =
               e.status === 401 || e.metaCode === 190 || e.metaCode === 10 || e.metaCode === 200;

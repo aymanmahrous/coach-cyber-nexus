@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { withTimeout } from "@/lib/integration-guards";
+
+const PROVIDER_TIMEOUT_MS = 30_000;
+const GATEWAY_TIMEOUT_MS = 60_000;
 
 const SYSTEM = `You are "Coach Brain", the expert AI advisor, head swimming coach, and operating sales engine for Coach Ayman Swimming & Relax Fix Hub in Abu Dhabi.
 Reply in the user's language (Arabic by default, or English if asked). Be concise, practical, authoritative, and structured with markdown.
