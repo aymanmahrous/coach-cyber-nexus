@@ -14,6 +14,12 @@ import {
   checkBrainRateLimit,
   clearRateLimitMap,
 } from "../src/routes/api/brain.ts";
+import {
+  timingSafeEqualStr,
+  getClientIp,
+  verifyOwnerPin,
+  clearPinFailures,
+} from "../src/lib/security.ts";
 
 function signPayload(body, secret) {
   const hmac = crypto.createHmac("sha256", secret);
@@ -47,19 +53,102 @@ test("1. Meta Webhook Handshake (GET) - Valid & Invalid tokens", async () => {
   assert.equal(missingModeRes.status, 403);
 });
 
-test("2. Meta Webhook In-Memory Inbox Query (?action=inbox)", async () => {
+test("2. Meta Webhook Protected Inbox Access (?action=inbox) - Auth Enforced", async () => {
   clearInboundBuffer();
-  const req = new Request("https://example.com/api/meta-webhook?action=inbox");
-  const res = await handleMetaWebhookGet(req);
-  assert.equal(res.status, 200);
-  const data = await res.json();
-  assert.equal(data.ok, true);
-  assert.equal(data.storage, "ephemeral_memory");
-  assert.equal(data.durable, false);
-  assert.equal(Array.isArray(data.messages), true);
+  clearPinFailures();
+  const validPin = "SuperOwnerPin2026!";
+  process.env.OWNER_PUBLISH_PIN = validPin;
+
+  // 2a. Unauthenticated request without PIN -> 401 Unauthorized
+  const unauthReq = new Request("https://example.com/api/meta-webhook?action=inbox");
+  const unauthRes = await handleMetaWebhookGet(unauthReq);
+  assert.equal(unauthRes.status, 401, "Must reject unauthenticated access to customer messages");
+  const unauthData = await unauthRes.json();
+  assert.equal(unauthData.ok, false);
+  assert.equal(unauthData.error, "invalid_owner_pin");
+  assert.equal(unauthData.storage, "protected");
+
+  // 2b. Wrong PIN provided -> 401 Unauthorized
+  const wrongPinReq = new Request("https://example.com/api/meta-webhook?action=inbox", {
+    headers: { "x-owner-pin": "WrongPin999" },
+  });
+  const wrongPinRes = await handleMetaWebhookGet(wrongPinReq);
+  assert.equal(wrongPinRes.status, 401);
+
+  // 2c. Valid PIN via x-owner-pin header -> 200 OK
+  const validPinReq = new Request("https://example.com/api/meta-webhook?action=inbox", {
+    headers: { "x-owner-pin": validPin },
+  });
+  const validPinRes = await handleMetaWebhookGet(validPinReq);
+  assert.equal(validPinRes.status, 200);
+  const validData = await validPinRes.json();
+  assert.equal(validData.ok, true);
+  assert.equal(validData.storage, "ephemeral_memory");
+  assert.equal(Array.isArray(validData.messages), true);
+
+  // 2d. Valid PIN via Authorization: Bearer header -> 200 OK
+  const bearerReq = new Request("https://example.com/api/meta-webhook?action=inbox", {
+    headers: { Authorization: `Bearer ${validPin}` },
+  });
+  const bearerRes = await handleMetaWebhookGet(bearerReq);
+  assert.equal(bearerRes.status, 200);
+
+  // 2e. Server unconfigured (no OWNER_PUBLISH_PIN) -> 503 Disabled
+  const savedPin = process.env.OWNER_PUBLISH_PIN;
+  delete process.env.OWNER_PUBLISH_PIN;
+  delete process.env.OWNER_PIN;
+
+  const unconfReq = new Request("https://example.com/api/meta-webhook?action=inbox", {
+    headers: { "x-owner-pin": validPin },
+  });
+  const unconfRes = await handleMetaWebhookGet(unconfReq);
+  assert.equal(unconfRes.status, 503, "Must disable inbox access if owner PIN is not configured on server");
+
+  process.env.OWNER_PUBLISH_PIN = savedPin;
 });
 
-test("3. Meta Webhook POST - Fail-Closed when META_APP_SECRET is missing", async () => {
+test("3. Security Library - verifyOwnerPin brute-force defense & getClientIp", () => {
+  clearPinFailures();
+  const pin = "SecurePassword123";
+
+  // Test failure lockout after 5 attempts
+  for (let i = 0; i < 5; i++) {
+    const res = verifyOwnerPin("bad_pin", pin, "test_client_ip");
+    assert.equal(res.ok, false);
+    assert.equal(res.status, 401);
+  }
+  // 6th attempt should be locked out with 429
+  const lockedRes = verifyOwnerPin("bad_pin", pin, "test_client_ip");
+  assert.equal(lockedRes.ok, false);
+  assert.equal(lockedRes.status, 429);
+
+  // Test getClientIp prioritization
+  const cfReq = new Request("https://example.com", {
+    headers: {
+      "cf-connecting-ip": "1.1.1.1",
+      "x-real-ip": "2.2.2.2",
+      "x-forwarded-for": "3.3.3.3, 4.4.4.4",
+    },
+  });
+  assert.equal(getClientIp(cfReq), "1.1.1.1", "Must prioritize cf-connecting-ip from Cloudflare Edge");
+
+  const vercelReq = new Request("https://example.com", {
+    headers: {
+      "x-real-ip": "2.2.2.2",
+      "x-forwarded-for": "3.3.3.3, 4.4.4.4",
+    },
+  });
+  assert.equal(getClientIp(vercelReq), "2.2.2.2", "Must prioritize x-real-ip when cf-connecting-ip is absent");
+
+  const untrustedReq = new Request("https://example.com", {
+    headers: {
+      "x-forwarded-for": "3.3.3.3, 4.4.4.4",
+    },
+  });
+  assert.equal(getClientIp(untrustedReq), "unknown-client", "Untrusted X-Forwarded-For must be ignored to prevent IP spoofing");
+});
+
+test("4. Meta Webhook POST - Fail-Closed when META_APP_SECRET is missing", async () => {
   const originalSecret = process.env.META_APP_SECRET;
   delete process.env.META_APP_SECRET;
 
@@ -80,7 +169,7 @@ test("3. Meta Webhook POST - Fail-Closed when META_APP_SECRET is missing", async
   process.env.META_APP_SECRET = originalSecret || "test_app_secret_abc";
 });
 
-test("4. Meta Webhook POST - Signature Validation (Valid, Invalid, Missing)", async () => {
+test("5. Meta Webhook POST - Signature Validation (Valid, Invalid, Missing)", async () => {
   const secret = "my_meta_app_secret_999";
   process.env.META_APP_SECRET = secret;
 
@@ -102,7 +191,7 @@ test("4. Meta Webhook POST - Signature Validation (Valid, Invalid, Missing)", as
     ],
   });
 
-  // 4a. Missing signature
+  // 5a. Missing signature
   const missingSigReq = new Request("https://example.com/api/meta-webhook", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -111,7 +200,7 @@ test("4. Meta Webhook POST - Signature Validation (Valid, Invalid, Missing)", as
   const missingSigRes = await handleMetaWebhookPost(missingSigReq);
   assert.equal(missingSigRes.status, 403);
 
-  // 4b. Invalid / Forged signature
+  // 5b. Invalid / Forged signature
   const invalidSigReq = new Request("https://example.com/api/meta-webhook", {
     method: "POST",
     headers: {
@@ -123,7 +212,7 @@ test("4. Meta Webhook POST - Signature Validation (Valid, Invalid, Missing)", as
   const invalidSigRes = await handleMetaWebhookPost(invalidSigReq);
   assert.equal(invalidSigRes.status, 403);
 
-  // 4c. Valid signature
+  // 5c. Valid signature
   clearInboundBuffer();
   const validSig = signPayload(payloadStr, secret);
   const validSigReq = new Request("https://example.com/api/meta-webhook", {
@@ -145,7 +234,7 @@ test("4. Meta Webhook POST - Signature Validation (Valid, Invalid, Missing)", as
   assert.equal(inboundMessageBuffer[0].text, "مرحباً، أريد الاستفسار عن حجز السباحة");
 });
 
-test("5. Meta Webhook POST - Invalid JSON body returns 400", async () => {
+test("6. Meta Webhook POST - Invalid JSON body returns 400", async () => {
   const secret = "my_meta_app_secret_999";
   process.env.META_APP_SECRET = secret;
 
@@ -167,7 +256,7 @@ test("5. Meta Webhook POST - Invalid JSON body returns 400", async () => {
   assert.match(data.error, /Invalid JSON/);
 });
 
-test("6. Inbound Event Parser (parseMetaInboundEvents) - WhatsApp Cloud API format", () => {
+test("7. Inbound Event Parser (parseMetaInboundEvents) - WhatsApp Cloud API format", () => {
   const waPayload = {
     object: "whatsapp_business_account",
     entry: [
@@ -204,10 +293,10 @@ test("6. Inbound Event Parser (parseMetaInboundEvents) - WhatsApp Cloud API form
   assert.equal(parsed[0].text, "كم سعر مجموعات الأطفال في فرع المشرف؟");
 });
 
-test("7. Coach Brain (/api/brain) - Security, CSRF Guard & Rate Limiting", async () => {
+test("8. Coach Brain (/api/brain) - Security, CSRF Guard & Rate Limiting", async () => {
   clearRateLimitMap();
 
-  // 7a. CSRF Guard: Cross-site request rejected
+  // 8a. CSRF Guard: Cross-site request rejected
   const crossSiteReq = new Request("https://example.com/api/brain", {
     method: "POST",
     headers: {
@@ -219,7 +308,7 @@ test("7. Coach Brain (/api/brain) - Security, CSRF Guard & Rate Limiting", async
   const crossSiteRes = await handleBrainPost(crossSiteReq);
   assert.equal(crossSiteRes.status, 403);
 
-  // 7b. Invalid Payload (empty messages)
+  // 8b. Invalid Payload (empty messages)
   const emptyReq = new Request("https://example.com/api/brain", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -228,7 +317,7 @@ test("7. Coach Brain (/api/brain) - Security, CSRF Guard & Rate Limiting", async
   const emptyRes = await handleBrainPost(emptyReq);
   assert.equal(emptyRes.status, 400);
 
-  // 7c. Excessive token length guard (>15,000 chars)
+  // 8c. Excessive token length guard (>15,000 chars)
   const hugeReq = new Request("https://example.com/api/brain", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -239,7 +328,7 @@ test("7. Coach Brain (/api/brain) - Security, CSRF Guard & Rate Limiting", async
   const hugeRes = await handleBrainPost(hugeReq);
   assert.equal(hugeRes.status, 400);
 
-  // 7d. Rate Limiting enforcement
+  // 8d. Rate Limiting enforcement
   const testIp = "192.168.1.100";
   let allowed = 0;
   for (let i = 0; i < 25; i++) {
@@ -249,7 +338,7 @@ test("7. Coach Brain (/api/brain) - Security, CSRF Guard & Rate Limiting", async
   assert.equal(allowed, 20, "Rate limit must allow exactly 20 requests per minute per IP");
   assert.equal(checkBrainRateLimit(testIp).allowed, false);
 
-  // 7e. No provider configured returns honest 500 error (never fake generated reply)
+  // 8e. No provider configured returns honest 500 error (never fake generated reply)
   const originalGemini = process.env.GEMINI_API_KEY;
   const originalGoogle = process.env.GOOGLE_API_KEY;
   const originalOpenAI = process.env.OPENAI_API_KEY;

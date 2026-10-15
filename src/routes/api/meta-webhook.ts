@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { timingSafeEqualStr, getClientIp, verifyOwnerPin } from "../../lib/security.ts";
 
 /**
  * Official Meta Webhook verification & ingress endpoint.
  * Supports: Facebook Pages / Messenger, Instagram Direct, and WhatsApp Business Account.
  *
  * GET: Handles Meta Webhook verification handshake (hub.mode, hub.verify_token, hub.challenge)
- *      or returns the in-memory buffered inbox status (?action=inbox).
+ *      or returns the in-memory buffered inbox (?action=inbox) ONLY for authenticated owner.
  * POST: Handles incoming events with strict HMAC SHA-256 signature verification (X-Hub-Signature-256)
  *       Fail-closed: Rejects if META_APP_SECRET is not configured.
  */
@@ -24,15 +25,6 @@ export const inboundMessageBuffer: InboundMetaMessage[] = [];
 
 export function clearInboundBuffer(): void {
   inboundMessageBuffer.length = 0;
-}
-
-export function timingSafeEqualStr(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return result === 0;
 }
 
 export async function verifyMetaSignature(
@@ -122,21 +114,57 @@ export function parseMetaInboundEvents(payload: any): InboundMetaMessage[] {
 export async function handleMetaWebhookGet(request: Request): Promise<Response> {
   const url = new URL(request.url);
 
-  // If querying in-memory inbox status
+  // Protected inbox access: Requires valid Owner PIN
   if (url.searchParams.get("action") === "inbox") {
+    const authHeader = request.headers.get("authorization") || "";
+    const bearerPin = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
+    const headerPin = request.headers.get("x-owner-pin");
+    const queryPin = url.searchParams.get("pin");
+    const providedPin = headerPin || bearerPin || queryPin;
+
+    const configuredPin =
+      process.env["OWNER_PUBLISH_PIN"] || process.env["OWNER_PIN"];
+    const clientIp = getClientIp(request);
+
+    const authCheck = verifyOwnerPin(providedPin, configuredPin, clientIp);
+    if (!authCheck.ok) {
+      const isUnconfigured = authCheck.status === 503;
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: authCheck.error,
+          message: isUnconfigured
+            ? "Inbox access is temporarily disabled because OWNER_PUBLISH_PIN is not configured."
+            : "Unauthorized: Valid Owner PIN is required to read customer messages.",
+          storage: "protected",
+        }),
+        {
+          status: authCheck.status,
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+          },
+        },
+      );
+    }
+
+    // Authenticated owner access granted
     return new Response(
       JSON.stringify({
         ok: true,
         storage: "ephemeral_memory",
         durable: false,
         notice:
-          "No persistent database is configured. Incoming messages are buffered in ephemeral memory only and reset upon server restart.",
+          "No persistent database is configured in this repository. Inbound messages are held in ephemeral server memory only and reset upon server restart.",
         count: inboundMessageBuffer.length,
         messages: inboundMessageBuffer,
       }),
       {
         status: 200,
-        headers: { "Content-Type": "application/json; charset=utf-8" },
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
       },
     );
   }

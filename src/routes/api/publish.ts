@@ -1,3 +1,4 @@
+import { timingSafeEqualStr, getClientIp } from "../../lib/security.ts";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
@@ -146,14 +147,14 @@ export const Route = createFileRoute("/api/publish")({
         if (!c.pinValid) return json({ error: "publish_pin_too_weak" }, 503);
 
         // Best-effort lockout (per worker instance) + fixed delay on failure.
-        const who = clientKey(request);
+        const who = getClientIp(request);
         const now = Date.now();
         const f = failures.get(who);
         if (f && now - f.first < FAIL_WINDOW_MS && f.count >= MAX_FAILS) {
           await sleep(FAIL_DELAY_MS);
           return json({ error: "too_many_attempts" }, 429);
         }
-        if (!safeEqual(pin, c.pin)) {
+        if (!timingSafeEqualStr(pin, c.pin)) {
           const next =
             f && now - f.first < FAIL_WINDOW_MS
               ? { count: f.count + 1, first: f.first }

@@ -1,3 +1,4 @@
+import { getClientIp } from "../../lib/security.ts";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
@@ -92,10 +93,7 @@ export async function handleBrainPost(request: Request): Promise<Response> {
   }
 
   // 2. Abuse Protection / Rate Limiting
-  const clientIp =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown-client";
+  const clientIp = getClientIp(request);
 
   const rateLimit = checkBrainRateLimit(clientIp);
   if (!rateLimit.allowed) {

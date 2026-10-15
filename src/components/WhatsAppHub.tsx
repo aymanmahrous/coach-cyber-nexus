@@ -10,6 +10,8 @@ import {
   RefreshCw,
   Inbox,
   AlertCircle,
+  Lock,
+  KeyRound,
 } from "lucide-react";
 
 type Lang = "ar" | "en";
@@ -23,7 +25,7 @@ interface InboundMessage {
   id: string;
   platform: "messenger" | "instagram" | "whatsapp" | "unknown";
   senderId: string;
-  senderName?: string;
+  senderName?: string | undefined;
   text: string;
   timestamp: number;
 }
@@ -69,6 +71,8 @@ export function WhatsAppHub({ lang, log }: WhatsAppHubProps) {
 
   const [inboxMessages, setInboxMessages] = useState<InboundMessage[]>([]);
   const [loadingInbox, setLoadingInbox] = useState(false);
+  const [inboxAuthRequired, setInboxAuthRequired] = useState(false);
+  const [inboxUnconfigured, setInboxUnconfigured] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]!.id);
   const [customText, setCustomText] = useState(isAr ? TEMPLATES[0]!.textAr : TEMPLATES[0]!.textEn);
   const [clientQuery, setClientQuery] = useState("");
@@ -89,21 +93,47 @@ export function WhatsAppHub({ lang, log }: WhatsAppHubProps) {
 
   const waLink = `https://wa.me/${phoneE164}?text=${encodeURIComponent(customText)}`;
 
-  const fetchInbox = async () => {
+  const fetchInbox = async (explicitPin?: string) => {
     setLoadingInbox(true);
     try {
-      const res = await fetch("/api/meta-webhook?action=inbox");
-      if (res.ok) {
+      const pin = explicitPin ?? (sessionStorage.getItem("owner-pin") || "");
+      const headers: Record<string, string> = {};
+      if (pin) headers["x-owner-pin"] = pin;
+
+      const res = await fetch("/api/meta-webhook?action=inbox", { headers });
+
+      if (res.status === 401 || res.status === 403) {
+        setInboxAuthRequired(true);
+        setInboxUnconfigured(false);
+        setInboxMessages([]);
+      } else if (res.status === 503) {
+        setInboxUnconfigured(true);
+        setInboxAuthRequired(false);
+        setInboxMessages([]);
+      } else if (res.ok) {
+        setInboxAuthRequired(false);
+        setInboxUnconfigured(false);
         const data = await res.json();
         if (Array.isArray(data?.messages)) {
           setInboxMessages(data.messages);
         }
       }
     } catch {
-      // Endpoint may not be active or network error; keep state empty
+      // Endpoint network issue; fail-closed quietly
     } finally {
       setLoadingInbox(false);
     }
+  };
+
+  const handlePromptOwnerPin = () => {
+    const pin = window.prompt(
+      isAr
+        ? "أدخل رمز المالك (Owner PIN) المكون من 8 خانات على الأقل لعرض رسائل العملاء:"
+        : "Enter the Owner PIN (min 8 characters) to view customer messages:",
+    );
+    if (!pin) return;
+    sessionStorage.setItem("owner-pin", pin.trim());
+    fetchInbox(pin.trim());
   };
 
   useEffect(() => {
@@ -240,25 +270,25 @@ ${channelContext}
               <div className="flex items-center gap-2">
                 <h2 className="font-display text-sm tracking-wider text-warning">
                   {isAr
-                    ? "مركز الرسائل — الاستقبال عبر Webhook المؤقت"
-                    : "Messaging Center — Ephemeral Webhook Mode"}
+                    ? "مركز الرسائل — الاستقبال عبر Webhook المحمي"
+                    : "Messaging Center — Protected Webhook Mode"}
                 </h2>
                 <span className="rounded-full bg-warning/15 px-2 py-0.5 font-mono text-[11px] text-warning font-bold">
-                  {isAr ? "مراجعة واعتماد بشري" : "Human-in-the-loop"}
+                  {isAr ? "محمي برمز المالك" : "Owner Authenticated"}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
                 {isAr
-                  ? "يستقبل مسار Webhook الرسائل الموثقة ويحتفظ بها في ذاكرة الخادم المؤقتة (لا توجد قاعدة بيانات دائمة). يمكنك تحويل أي استفسار إلى كوتش براين ومراجعته قبل الإرسال."
-                  : "The Webhook endpoint receives verified events and buffers them in server memory (no persistent database). You can convert any query to Coach Brain and review before sending."}
+                  ? "يستقبل مسار Webhook الرسائل الموثقة ويحتفظ بها في ذاكرة الخادم المؤقتة. القراءة مشروطة برمز المالك (PIN). لا توجد قاعدة بيانات دائمة."
+                  : "The Webhook receives verified events in ephemeral memory. Reading requires Owner PIN. No persistent database."}
               </p>
             </div>
           </div>
 
           <span className="rounded-lg border border-warning/30 px-3 py-2 text-xs text-warning">
             {isAr
-              ? "يتطلب ضبط META_WEBHOOK_VERIFY_TOKEN و META_APP_SECRET"
-              : "Requires META_WEBHOOK_VERIFY_TOKEN & META_APP_SECRET"}
+              ? "يتطلب ضبط META_APP_SECRET و OWNER_PUBLISH_PIN"
+              : "Requires META_APP_SECRET & OWNER_PUBLISH_PIN"}
           </span>
         </div>
 
@@ -277,7 +307,7 @@ ${channelContext}
               {isAr ? "الرسائل بالذاكرة المؤقتة:" : "Buffered In-Memory:"}
             </span>
             <div className="font-mono text-sm font-bold text-foreground mt-0.5">
-              {inboxMessages.length} {isAr ? "رسالة" : "msgs"}
+              {inboxAuthRequired ? "🔒 محمي" : `${inboxMessages.length} ${isAr ? "رسالة" : "msgs"}`}
             </div>
           </div>
           <div className="rounded-lg border border-border bg-background/50 p-2.5">
@@ -299,7 +329,7 @@ ${channelContext}
         </div>
       </section>
 
-      {/* 2. Inbound Messages Inbox (Backed by in-memory webhook buffer) */}
+      {/* 2. Inbound Messages Inbox (Protected by Owner PIN) */}
       <section className="glass space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -311,27 +341,63 @@ ${channelContext}
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={fetchInbox}
+              onClick={() => fetchInbox()}
               disabled={loadingInbox}
-              className="flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
+              className="flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground cursor-pointer"
             >
               <RefreshCw className={`size-3 ${loadingInbox ? "animate-spin" : ""}`} />
               {isAr ? "تحديث" : "Refresh"}
             </button>
             <span className="text-xs text-muted-foreground">
-              {inboxMessages.length > 0
-                ? isAr
-                  ? `${inboxMessages.length} رسالة بالذاكرة`
-                  : `${inboxMessages.length} in memory`
-                : isAr
-                  ? "الذاكرة فارغة"
-                  : "Empty"}
+              {inboxAuthRequired
+                ? isAr ? "يتطلب إذن المالك" : "Auth Required"
+                : inboxMessages.length > 0
+                  ? isAr ? `${inboxMessages.length} رسالة` : `${inboxMessages.length} msgs`
+                  : isAr ? "الذاكرة فارغة" : "Empty"}
             </span>
           </div>
         </div>
 
         <div className="space-y-3">
-          {inboxMessages.map((msg) => (
+          {/* Auth Required State */}
+          {inboxAuthRequired && (
+            <div className="rounded-lg border border-warning/40 bg-warning/5 p-5 text-center space-y-3">
+              <Lock className="size-6 mx-auto text-warning" />
+              <div className="space-y-1">
+                <h4 className="text-sm font-bold text-foreground">
+                  {isAr ? "صندوق الوارد محمي برمز المالك" : "Inbox Protected with Owner PIN"}
+                </h4>
+                <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                  {isAr
+                    ? "لحماية خصوصية العملاء، لا يمكن عرض الرسائل الواردة إلا بعد التحقق من هوية المالك باستخدام رمز PIN المعتمد."
+                    : "To safeguard client privacy, viewing incoming messages requires verified Owner PIN authentication."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handlePromptOwnerPin}
+                className="inline-flex items-center gap-2 rounded-lg bg-warning text-warning-foreground font-semibold px-4 py-2 text-xs shadow-sm hover:opacity-90 cursor-pointer"
+              >
+                <KeyRound className="size-3.5" />
+                {isAr ? "إدخال رمز المالك لعرض الرسائل" : "Enter Owner PIN"}
+              </button>
+            </div>
+          )}
+
+          {/* Unconfigured State */}
+          {inboxUnconfigured && (
+            <div className="rounded-lg border border-border p-5 text-center space-y-2">
+              <AlertCircle className="size-6 mx-auto text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">
+                {isAr
+                  ? "قراءة صندوق الوارد معطلة مؤقتاً لعدم ضبط OWNER_PUBLISH_PIN على الخادم حفاظاً على خصوصية العملاء."
+                  : "Inbox access is temporarily disabled because OWNER_PUBLISH_PIN is not configured on the server."}
+              </p>
+            </div>
+          )}
+
+          {/* Authenticated Messages List */}
+          {!inboxAuthRequired && !inboxUnconfigured && inboxMessages.map((msg) => (
             <div
               key={msg.id}
               className="rounded-lg border border-border bg-background/40 p-3.5 space-y-2.5 hover:border-primary/50 transition"
@@ -372,7 +438,7 @@ ${channelContext}
                   type="button"
                   onClick={() => handleDraftFromInbox(msg)}
                   disabled={generatingReply}
-                  className="flex items-center gap-1.5 rounded bg-primary/20 border border-primary/30 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/30 transition"
+                  className="flex items-center gap-1.5 rounded bg-primary/20 border border-primary/30 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/30 transition cursor-pointer"
                 >
                   <Sparkles className="size-3" />
                   {isAr ? "صياغة رد بواسطة كوتش براين" : "Draft Reply with Coach Brain"}
@@ -381,7 +447,7 @@ ${channelContext}
             </div>
           ))}
 
-          {inboxMessages.length === 0 && (
+          {!inboxAuthRequired && !inboxUnconfigured && inboxMessages.length === 0 && (
             <div className="rounded-lg border border-dashed border-border p-6 text-center space-y-2">
               <AlertCircle className="size-5 mx-auto text-muted-foreground" />
               <p className="text-xs text-muted-foreground">
@@ -488,7 +554,7 @@ ${channelContext}
             <button
               type="button"
               onClick={() => setReplyChannel("whatsapp")}
-              className={`rounded px-2.5 py-1 font-medium transition ${
+              className={`rounded px-2.5 py-1 font-medium transition cursor-pointer ${
                 replyChannel === "whatsapp"
                   ? "bg-emerald-600 text-white shadow-sm"
                   : "text-muted-foreground"
@@ -499,7 +565,7 @@ ${channelContext}
             <button
               type="button"
               onClick={() => setReplyChannel("messenger")}
-              className={`rounded px-2.5 py-1 font-medium transition ${
+              className={`rounded px-2.5 py-1 font-medium transition cursor-pointer ${
                 replyChannel === "messenger"
                   ? "bg-blue-600 text-white shadow-sm"
                   : "text-muted-foreground"
@@ -510,7 +576,7 @@ ${channelContext}
             <button
               type="button"
               onClick={() => setReplyChannel("instagram")}
-              className={`rounded px-2.5 py-1 font-medium transition ${
+              className={`rounded px-2.5 py-1 font-medium transition cursor-pointer ${
                 replyChannel === "instagram"
                   ? "bg-pink-600 text-white shadow-sm"
                   : "text-muted-foreground"
