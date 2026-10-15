@@ -97,7 +97,7 @@ function readConfig() {
     version,
     facebook: fbToken && fbPage ? { token: fbToken, id: fbPage } : null,
     instagram: igToken && igAccount ? { token: igToken, id: igAccount } : null,
-    webhook: Boolean(webhookToken),
+    webhook: Boolean(webhookToken && env("META_APP_SECRET")),
   };
 }
 
