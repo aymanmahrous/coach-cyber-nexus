@@ -137,7 +137,7 @@ export async function sendStaffWhatsAppMessage(session: StaffSession, conversati
   const response = await fetch(`${url}/functions/v1/send-whatsapp-message`, {
     method: "POST",
     headers: authHeaders(session, anonKey),
-    body: JSON.stringify({ conversationId, body: body.trim() }),
+    body: JSON.stringify({ conversationId, body: body.trim(), dryRun: true }),
   });
   const result = (await response.json()) as { success?: boolean; code?: string; dryRun?: boolean };
   if (!response.ok || result.success !== true) throw new Error(result.code || `SEND_FAILED_${response.status}`);

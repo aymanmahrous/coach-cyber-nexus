@@ -31,6 +31,7 @@ test("Inbox reads, message history, takeover, and AI return use existing Staff R
 test("Outbound reply path is role-gated and reports dry-run status", () => {
   assert.match(adapter, /SEND_ROLES/);
   assert.match(adapter, /functions\/v1\/send-whatsapp-message/);
+  assert.match(adapter, /dryRun: true/);
   assert.match(adapter, /dryRun/);
   assert.match(component, /canSendStaffWhatsApp/);
   assert.match(component, /Send via existing function \(dry-run\)/);
