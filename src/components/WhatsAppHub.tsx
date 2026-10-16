@@ -1,4 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import {
+  canSendStaffWhatsApp,
+  getStaffConversationMessages,
+  getStaffInbox,
+  returnStaffConversationToAi,
+  sendStaffWhatsAppMessage,
+  signInStaff,
+  takeOverStaffConversation,
+  type StaffInboxMessage,
+  type StaffSession,
+} from "@/lib/staff-whatsapp";
 import {
   Check,
   Copy,
@@ -7,8 +18,13 @@ import {
   Phone,
   Send,
   Sparkles,
+  RefreshCw,
+  Inbox,
+  AlertCircle,
+  Lock,
+  KeyRound,
   ShieldCheck,
-  CheckCircle2,
+  Radio,
 } from "lucide-react";
 
 type Lang = "ar" | "en";
@@ -18,15 +34,13 @@ interface WhatsAppHubProps {
   log: (s: string, tone?: "info" | "ok" | "err") => void;
 }
 
-interface LiveConversation {
-  id: string;
-  clientName: string;
-  clientHandle: string;
-  channel: "whatsapp" | "messenger" | "instagram";
-  incomingText: string;
-  aiAutoReply: string;
-  timestamp: string;
-  branch?: string;
+type InboundMessage = StaffInboxMessage;
+
+interface ChannelStatusMap {
+  whatsapp?: { status: string; configured: boolean; verifiedLive: boolean; missingConfig: string[] };
+  messenger?: { status: string; configured: boolean; verifiedLive: boolean; missingConfig: string[] };
+  instagram?: { status: string; configured: boolean; verifiedLive: boolean; missingConfig: string[] };
+  facebook_page?: { status: string; configured: boolean; verifiedLive: boolean; missingConfig: string[] };
 }
 
 const TEMPLATES = [
@@ -67,7 +81,17 @@ const TEMPLATES = [
 
 export function WhatsAppHub({ lang, log }: WhatsAppHubProps) {
   const isAr = lang === "ar";
-  const conversations: LiveConversation[] = [];
+
+  const [inboxMessages, setInboxMessages] = useState<InboundMessage[]>([]);
+  const [loadingInbox, setLoadingInbox] = useState(false);
+  const [staffSession, setStaffSession] = useState<StaffSession | null>(null);
+  const [staffEmail, setStaffEmail] = useState("");
+  const [staffPassword, setStaffPassword] = useState("");
+  const [staffAuthError, setStaffAuthError] = useState("");
+  const [staffAuthBusy, setStaffAuthBusy] = useState(false);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [conversationMessages, setConversationMessages] = useState<unknown[]>([]);
+  const [channelDiagnostics, setChannelDiagnostics] = useState<ChannelStatusMap>({});
 
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]!.id);
   const [customText, setCustomText] = useState(isAr ? TEMPLATES[0]!.textAr : TEMPLATES[0]!.textEn);
@@ -88,6 +112,71 @@ export function WhatsAppHub({ lang, log }: WhatsAppHubProps) {
   const instagramUrl = "https://www.instagram.com/direct/inbox/";
 
   const waLink = `https://wa.me/${phoneE164}?text=${encodeURIComponent(customText)}`;
+
+  const fetchChannelStatus = async () => {
+    try {
+      const res = await fetch("/api/meta-webhook?action=status");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.channels) {
+          setChannelDiagnostics(data.channels);
+        }
+      }
+    } catch {
+      // Quiet failover
+    }
+  };
+
+  const fetchInbox = async (session = staffSession) => {
+    if (!session) return;
+    setLoadingInbox(true);
+    try {
+      setInboxMessages(await getStaffInbox(session));
+      setStaffAuthError("");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "INBOX_FAILED";
+      if (message === "SESSION_EXPIRED" || message === "STAFF_ACCESS_DENIED") {
+        setStaffSession(null);
+        setInboxMessages([]);
+      } else {
+        setStaffAuthError(message);
+      }
+    } finally {
+      setLoadingInbox(false);
+    }
+  };
+
+  const handleStaffSignIn = async () => {
+    if (!staffEmail.trim() || !staffPassword) return;
+    setStaffAuthBusy(true);
+    setStaffAuthError("");
+    try {
+      const session = await signInStaff(staffEmail, staffPassword);
+      setStaffSession(session);
+      setStaffPassword("");
+      await fetchInbox(session);
+      log(isAr ? `تم تسجيل دخول الموظف: ${session.displayName}` : `Staff session opened for ${session.displayName}`, "ok");
+    } catch (error) {
+      setStaffAuthError(error instanceof Error ? error.message : "LOGIN_FAILED");
+    } finally {
+      setStaffAuthBusy(false);
+    }
+  };
+
+  const handleStaffSignOut = () => {
+    setStaffSession(null);
+    setInboxMessages([]);
+    setSelectedConversationId(null);
+    setConversationMessages([]);
+  };
+
+  useEffect(() => {
+    fetchChannelStatus();
+  }, []);
+
+  useEffect(() => {
+    if (staffSession) fetchInbox(staffSession);
+  }, [staffSession]);
 
   const copyLink = async () => {
     await navigator.clipboard.writeText(waLink);
@@ -118,22 +207,54 @@ export function WhatsAppHub({ lang, log }: WhatsAppHubProps) {
     instagram: isAr ? "إنستغرام دايركت (@RelaxFixUAE)" : "Instagram Direct (@RelaxFixUAE)",
   };
 
-  const generateReplyWithBrain = async () => {
-    if (!clientQuery.trim() || generatingReply) return;
+  const getStatusBadge = (status?: string) => {
+    if (status === "verified") {
+      return (
+        <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 font-mono text-[10px] text-emerald-400 font-bold">
+          {isAr ? "متصل ومتحقق" : "Verified"}
+        </span>
+      );
+    }
+    if (status === "configured_unverified") {
+      return (
+        <span className="rounded-full bg-blue-500/20 px-2 py-0.5 font-mono text-[10px] text-blue-400 font-bold">
+          {isAr ? "اعتماد متاح (غير مجرب)" : "Configured (Unverified)"}
+        </span>
+      );
+    }
+    if (status === "blocked") {
+      return (
+        <span className="rounded-full bg-destructive/20 px-2 py-0.5 font-mono text-[10px] text-destructive font-bold">
+          {isAr ? "مرفوض / صلاحية ناقصة" : "Blocked / Revoked"}
+        </span>
+      );
+    }
+    return (
+      <span className="rounded-full bg-warning/20 px-2 py-0.5 font-mono text-[10px] text-warning font-bold">
+        {isAr ? "بحاجة لإعداد" : "Needs Setup"}
+      </span>
+    );
+  };
+
+  const generateReplyWithBrain = async (overrideQuery?: string, overrideChannel?: "whatsapp" | "messenger" | "instagram") => {
+    const targetQuery = overrideQuery ?? clientQuery;
+    const targetChannel = overrideChannel ?? replyChannel;
+
+    if (!targetQuery.trim() || generatingReply) return;
     setGeneratingReply(true);
     setAiSuggestedReply("");
 
     const channelContext =
-      replyChannel === "messenger"
+      targetChannel === "messenger"
         ? "المنصة المستهدفة: فيسبوك مسنجر (Facebook Messenger). اكتب رداً ودوداً ومباشراً يناسب شات فيسبوك."
-        : replyChannel === "instagram"
+        : targetChannel === "instagram"
           ? "المنصة المستهدفة: إنستغرام دايركت (Instagram Direct). اكتب رداً جذاباً ومركزاً وسريعاً."
           : "المنصة المستهدفة: واتساب (WhatsApp). اكتب رداً مفصلاً ومرتباً مع نقاط واضحة.";
 
     const prompt = `أنت المساعد الذكي لمبيعات وتأهيل السباحة لكابتن أيمن (Swimming & Relax Fix Hub أبوظبي).
 ${channelContext}
 استفسار العميل الوارد:
-"${clientQuery}"
+"${targetQuery}"
 
 قواعد الرد النفسية والبيعية المعتمدة لكابتن أيمن (التزم بها بدقة):
 1. التعاطف والتطمين أولاً:
@@ -163,7 +284,7 @@ ${channelContext}
       setAiSuggestedReply(reply.trim());
       log(
         isAr
-          ? `تمت صياغة الرد لمنصة ${channelNames[replyChannel]} بواسطة كوتش براين`
+          ? `تمت صياغة الرد لمنصة ${channelNames[targetChannel]} بواسطة كوتش براين`
           : "AI reply generated",
         "ok",
       );
@@ -174,6 +295,64 @@ ${channelContext}
       );
     } finally {
       setGeneratingReply(false);
+    }
+  };
+
+  const handleDraftFromInbox = (msg: InboundMessage) => {
+    setSelectedConversationId(msg.conversationId);
+    setClientQuery(msg.text);
+    const mappedChannel =
+      msg.platform === "whatsapp" || msg.platform === "messenger" || msg.platform === "instagram"
+        ? msg.platform
+        : "whatsapp";
+    setReplyChannel(mappedChannel);
+    generateReplyWithBrain(msg.text, mappedChannel);
+  };
+
+  const handleLoadMessages = async (conversationId: string) => {
+    if (!staffSession) return;
+    try {
+      setSelectedConversationId(conversationId);
+      setConversationMessages(await getStaffConversationMessages(staffSession, conversationId));
+    } catch (error) {
+      log(`${isAr ? "فشل تحميل الرسائل" : "Message history failed"}: ${error instanceof Error ? error.message : "ERROR"}`, "err");
+    }
+  };
+
+  const handleTakeover = async (conversationId: string) => {
+    if (!staffSession) return;
+    try {
+      await takeOverStaffConversation(staffSession, conversationId);
+      await fetchInbox(staffSession);
+      log(isAr ? "تم تحويل المحادثة إلى الموظف" : "Conversation taken over by staff", "ok");
+    } catch (error) {
+      log(`${isAr ? "فشل التحويل" : "Takeover failed"}: ${error instanceof Error ? error.message : "ERROR"}`, "err");
+    }
+  };
+
+  const handleReturnToAi = async (conversationId: string) => {
+    if (!staffSession) return;
+    try {
+      await returnStaffConversationToAi(staffSession, conversationId);
+      await fetchInbox(staffSession);
+      log(isAr ? "عادت المحادثة إلى Coach Brain" : "Conversation returned to Coach Brain", "ok");
+    } catch (error) {
+      log(`${isAr ? "فشل الإرجاع" : "Return failed"}: ${error instanceof Error ? error.message : "ERROR"}`, "err");
+    }
+  };
+
+  const handleSendStaffReply = async () => {
+    if (!staffSession || !selectedConversationId || !aiSuggestedReply.trim()) return;
+    if (replyChannel !== "whatsapp") {
+      log(isAr ? "الإرسال الدائم متاح حالياً عبر وظيفة WhatsApp الحالية فقط" : "Durable send is currently wired to the existing WhatsApp function only", "err");
+      return;
+    }
+    try {
+      const result = await sendStaffWhatsAppMessage(staffSession, selectedConversationId, aiSuggestedReply);
+      log(result.dryRun ? (isAr ? "تم تسجيل إرسال تجريبي دون رسالة حقيقية" : "Dry-run reply recorded; no real message sent") : (isAr ? "تم إرسال الرد وتسجيله" : "Reply sent and recorded"), "ok");
+      await fetchInbox(staffSession);
+    } catch (error) {
+      log(`${isAr ? "فشل إرسال الرد" : "Reply failed"}: ${error instanceof Error ? error.message : "ERROR"}`, "err");
     }
   };
 
@@ -195,209 +374,174 @@ ${channelContext}
 
   return (
     <div className="space-y-4">
-      {/* 1. Honest integration status */}
-      <section className="glass space-y-4 border border-warning/30 bg-warning/5 p-4">
+      {/* 1. Transparent Omnichannel Status Header */}
+      <section className="glass space-y-4 border border-border p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-warning/15 text-warning">
-              <MessageCircle className="size-6" />
+            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Radio className="size-6 animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-display text-sm tracking-wider text-warning">
+                <h2 className="font-display text-sm tracking-wider text-primary">
                   {isAr
-                    ? "مركز الرسائل — الربط غير مفعّل"
-                    : "Messaging integrations are not connected"}
+                    ? "مركز تكاملات Meta الموحد (Coach Brain Ingress)"
+                    : "Unified Meta Omnichannel Hub"}
                 </h2>
-                <span className="rounded-full bg-warning/15 px-2 py-0.5 font-mono text-[11px] text-warning font-bold">
-                  {isAr ? "يدوي فقط" : "Manual only"}
+                <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                  Webhook v21.0
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
                 {isAr
-                  ? "لا يوجد صندوق وارد حي أو رد آلي متصل حالياً. يمكنك صياغة رد بمساعدة كوتش براين ثم مراجعته وفتحه يدوياً في التطبيق."
-                  : "No live inbox or automatic replies are connected. Draft a reply with Coach Brain, review it, then open the messaging app manually."}
+                  ? "فحص آمن يميز بين الإعداد الناقص، والاعتماد المتاح، والاتصال الذي اجتاز اختباراً فعلياً دون كشف أي أسرار."
+                  : "Safe diagnostics distinguishing missing setup, configured credentials, and verified live connection."}
               </p>
             </div>
           </div>
 
-          <span className="rounded-lg border border-warning/30 px-3 py-2 text-xs text-warning">
-            {isAr
-              ? "يتطلب WhatsApp Business API وربط المنصات"
-              : "Requires WhatsApp Business API and platform setup"}
-          </span>
+          <button
+            type="button"
+            onClick={() => {
+              fetchChannelStatus();
+              fetchInbox();
+            }}
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground cursor-pointer transition"
+          >
+            <RefreshCw className="size-3.5" />
+            {isAr ? "تحديث الحالة" : "Refresh Status"}
+          </button>
         </div>
 
-        {/* Live Metrics Grid */}
-        <div className="grid gap-3 sm:grid-cols-4 pt-1">
-          <div className="rounded-lg border border-border bg-background/50 p-2.5">
-            <span className="text-[11px] text-muted-foreground">
-              {isAr ? "حالة الرد التلقائي:" : "Auto-Reply Status:"}
-            </span>
-            <div className="text-sm font-bold text-warning mt-0.5">
-              {isAr ? "غير مربوط" : "Not connected"}
+        {/* Channel Diagnostic Cards */}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 pt-1">
+          {/* WhatsApp */}
+          <div className="rounded-lg border border-border bg-background/50 p-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-emerald-400">WhatsApp Cloud</span>
+              {getStatusBadge(channelDiagnostics.whatsapp?.status)}
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              {isAr ? "رقم الهاتف / الحساب:" : "Phone ID:"}{" "}
+              <span className="font-mono text-foreground font-semibold">058 821 9130</span>
             </div>
           </div>
-          <div className="rounded-lg border border-border bg-background/50 p-2.5">
-            <span className="text-[11px] text-muted-foreground">
-              {isAr ? "استفسارات اليوم المعالجة:" : "Today's Queries Handled:"}
-            </span>
-            <div className="font-mono text-sm font-bold text-foreground mt-0.5">
-              — {isAr ? "غير متاح" : "unavailable"}
+
+          {/* Messenger */}
+          <div className="rounded-lg border border-border bg-background/50 p-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-blue-400">FB Messenger</span>
+              {getStatusBadge(channelDiagnostics.messenger?.status)}
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              {isAr ? "الصفحة:" : "Page:"}{" "}
+              <span className="font-mono text-foreground font-semibold">m.me/{fbPageId}</span>
             </div>
           </div>
-          <div className="rounded-lg border border-border bg-background/50 p-2.5">
-            <span className="text-[11px] text-muted-foreground">
-              {isAr ? "حجوزات تقييم أولية مجانية:" : "Free Assessments Booked:"}
-            </span>
-            <div className="font-mono text-sm font-bold text-accent mt-0.5">
-              — {isAr ? "غير متاح" : "unavailable"}
+
+          {/* Instagram */}
+          <div className="rounded-lg border border-border bg-background/50 p-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-pink-400">Instagram DM</span>
+              {getStatusBadge(channelDiagnostics.instagram?.status)}
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              {isAr ? "الحساب:" : "Account:"}{" "}
+              <span className="font-mono text-foreground font-semibold">@RelaxFixUAE</span>
             </div>
           </div>
-          <div className="rounded-lg border border-border bg-background/50 p-2.5">
-            <span className="text-[11px] text-muted-foreground">
-              {isAr ? "زمن الاستجابة التلقائي:" : "Avg Response Time:"}
-            </span>
-            <div className="font-mono text-sm font-bold text-emerald-400 mt-0.5">
-              — {isAr ? "غير متاح" : "unavailable"}
+
+          {/* Facebook Publishing */}
+          <div className="rounded-lg border border-border bg-background/50 p-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-purple-400">FB Page Posts</span>
+              {getStatusBadge(channelDiagnostics.facebook_page?.status)}
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              {isAr ? "النشر المعتمد:" : "Publishing:"}{" "}
+              <span className="text-foreground font-semibold">{isAr ? "محمي برمز PIN" : "PIN Guarded"}</span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 2. Live inbox placeholder */}
+      {/* 2. Durable Supabase Staff Inbox */}
       <section className="glass space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <MessageCircle className="size-4 text-muted-foreground" />
+            <Inbox className="size-4 text-primary" />
             <h3 className="font-display text-sm tracking-wider text-primary">
-              {isAr ? "صندوق الرسائل الواردة" : "Incoming message inbox"}
+              {isAr ? "صندوق الموظفين الدائم (Supabase)" : "Durable Staff Inbox (Supabase)"}
             </h3>
           </div>
-          <span className="text-xs text-muted-foreground">
-            {isAr
-              ? "غير متصل — لا توجد بيانات رسائل فعلية"
-              : "Not connected — no live message data"}
-          </span>
+          <div className="flex items-center gap-2">
+            {staffSession && (
+              <>
+                <span className="text-xs text-muted-foreground">{staffSession.displayName}</span>
+                <button type="button" onClick={() => fetchInbox()} disabled={loadingInbox} className="flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-secondary cursor-pointer">
+                  <RefreshCw className={`size-3 ${loadingInbox ? "animate-spin" : ""}`} />
+                  {isAr ? "تحديث" : "Refresh"}
+                </button>
+                <button type="button" onClick={handleStaffSignOut} className="rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-secondary cursor-pointer">
+                  {isAr ? "خروج" : "Sign out"}
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
-        <div className="space-y-3">
-          {conversations.map((conv) => (
-            <div
-              key={conv.id}
-              className="rounded-lg border border-border bg-background/40 p-3.5 space-y-2.5 hover:border-primary/50 transition"
-            >
-              {/* Header */}
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`rounded-full px-2 py-0.5 font-semibold text-[11px] ${
-                      conv.channel === "whatsapp"
-                        ? "bg-emerald-500/20 text-emerald-400"
-                        : conv.channel === "messenger"
-                          ? "bg-blue-500/20 text-blue-400"
-                          : "bg-pink-500/20 text-pink-400"
-                    }`}
-                  >
-                    {conv.channel === "whatsapp"
-                      ? "WhatsApp"
-                      : conv.channel === "messenger"
-                        ? "Messenger"
-                        : "Instagram"}
-                  </span>
-                  <span className="font-bold text-foreground">{conv.clientName}</span>
-                  <span dir="ltr" className="font-mono text-muted-foreground text-[11px]">
-                    {conv.clientHandle}
-                  </span>
-                  {conv.branch && (
-                    <span className="rounded bg-secondary px-1.5 py-0.2 text-[10px] text-muted-foreground">
-                      📍 {conv.branch}
-                    </span>
+        {!staffSession ? (
+          <div className="rounded-lg border border-warning/40 bg-warning/5 p-5 space-y-3">
+            <div className="flex items-center gap-2 text-warning"><Lock className="size-4" /><strong className="text-sm">{isAr ? "دخول موظف مطلوب" : "Staff sign-in required"}</strong></div>
+            <p className="text-xs text-muted-foreground">{isAr ? "يستخدم هذا الدخول جلسة Supabase وصلاحيات Staff. لا يتم إرسال Owner PIN إلى المتصفح ولا تخزينه." : "This uses a Supabase Staff session. The Owner PIN is not sent to or stored in the browser."}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input value={staffEmail} onChange={(e) => setStaffEmail(e.target.value)} type="email" autoComplete="username" placeholder={isAr ? "البريد الإلكتروني" : "Staff email"} className="rounded border border-input bg-background/60 px-3 py-2 text-xs outline-none focus:border-primary" />
+              <input value={staffPassword} onChange={(e) => setStaffPassword(e.target.value)} type="password" autoComplete="current-password" placeholder={isAr ? "كلمة المرور" : "Password"} onKeyDown={(e) => { if (e.key === "Enter") handleStaffSignIn(); }} className="rounded border border-input bg-background/60 px-3 py-2 text-xs outline-none focus:border-primary" />
+            </div>
+            <button type="button" onClick={handleStaffSignIn} disabled={staffAuthBusy || !staffEmail.trim() || !staffPassword} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer">
+              {staffAuthBusy ? (isAr ? "جارٍ التحقق…" : "Signing in…") : (isAr ? "دخول آمن" : "Secure sign in")}
+            </button>
+            {staffAuthError && <p className="text-xs text-destructive">{staffAuthError}</p>}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {inboxMessages.map((msg) => (
+              <div key={msg.id} className="rounded-lg border border-border bg-background/40 p-3.5 space-y-2.5 hover:border-primary/50 transition">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-full px-2 py-0.5 font-semibold text-[11px] ${msg.platform === "whatsapp" ? "bg-emerald-500/20 text-emerald-400" : msg.platform === "messenger" ? "bg-blue-500/20 text-blue-400" : "bg-pink-500/20 text-pink-400"}`}>{msg.platform}</span>
+                    <span className="font-bold text-foreground">{msg.senderName || msg.senderId}</span>
+                    <span className="text-muted-foreground">{msg.unread} unread</span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">{new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+                <div className="rounded bg-secondary/50 p-2.5 text-xs text-foreground/90 leading-relaxed">{msg.text || (isAr ? "لا توجد رسالة أخيرة" : "No last message")}</div>
+                <div className="flex flex-wrap items-center justify-end gap-2 text-xs pt-1">
+                  <button type="button" onClick={() => { setSelectedConversationId(msg.conversationId); handleDraftFromInbox(msg); }} disabled={generatingReply} className="flex items-center gap-1.5 rounded bg-primary/20 border border-primary/30 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/30 transition cursor-pointer"><Sparkles className="size-3" />{isAr ? "صياغة رد" : "Draft reply"}</button>
+                  <button type="button" onClick={() => handleLoadMessages(msg.conversationId)} className="rounded border border-border px-2.5 py-1 text-[11px] text-muted-foreground hover:bg-secondary cursor-pointer">{isAr ? "عرض الرسائل" : "View messages"}</button>
+                  {msg.mode === "human_takeover" || msg.mode === "human_required" ? (
+                    <button type="button" onClick={() => handleReturnToAi(msg.conversationId)} className="rounded border border-primary/30 px-2.5 py-1 text-[11px] text-primary hover:bg-primary/10 cursor-pointer">{isAr ? "إرجاع إلى Coach Brain" : "Return to AI"}</button>
+                  ) : (
+                    <button type="button" onClick={() => handleTakeover(msg.conversationId)} className="rounded border border-warning/40 px-2.5 py-1 text-[11px] text-warning hover:bg-warning/10 cursor-pointer">{isAr ? "تحويل لموظف" : "Take over"}</button>
                   )}
                 </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-                    <CheckCircle2 className="size-3.5" />
-                    {isAr ? "تم الرد تلقائياً بالذكاء الاصطناعي" : "AI Auto-Replied"}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">{conv.timestamp}</span>
-                </div>
               </div>
-
-              {/* Message Exchange */}
-              <div className="space-y-1.5 text-xs">
-                <div className="rounded bg-secondary/50 p-2 text-foreground/90">
-                  <span className="font-semibold text-muted-foreground me-1">
-                    {isAr ? "العميل:" : "Client:"}
-                  </span>
-                  {conv.incomingText}
-                </div>
-                <div className="rounded border border-primary/20 bg-primary/5 p-2 text-foreground">
-                  <span className="font-semibold text-primary me-1">
-                    {isAr ? "رد كوتش براين التلقائي:" : "AI Reply:"}
-                  </span>
-                  {conv.aiAutoReply}
-                </div>
+            ))}
+            {inboxMessages.length === 0 && <div className="rounded-lg border border-dashed border-border p-6 text-center space-y-2"><AlertCircle className="size-5 mx-auto text-muted-foreground" /><p className="text-xs text-muted-foreground">{isAr ? "لا توجد محادثات واردة في Supabase أو لا تملك الجلسة صلاحية القراءة." : "No persisted conversations, or this Staff session has no access."}</p></div>}
+            {selectedConversationId && conversationMessages.length > 0 && (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+                <div className="text-xs font-semibold text-primary">{isAr ? "سجل الرسائل" : "Message history"}</div>
+                {conversationMessages.map((item, index) => {
+                  const row = item && typeof item === "object" ? item as Record<string, unknown> : {};
+                  const body = String(row["body"] || row["content"] || row["text"] || "");
+                  const direction = String(row["direction"] || row["sender_type"] || row["role"] || "");
+                  return <div key={`${selectedConversationId}-${index}`} className="rounded bg-background/50 p-2 text-xs"><span className="mr-2 text-muted-foreground">{direction}</span>{body}</div>;
+                })}
               </div>
-
-              {/* Quick Action */}
-              <div className="flex items-center justify-end gap-2 text-xs pt-1">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(conv.aiAutoReply);
-                    log(isAr ? "تم نسخ نص الرد" : "Reply copied", "ok");
-                  }}
-                  className="flex items-center gap-1 rounded border border-border px-2 py-1 text-[11px] hover:bg-secondary"
-                >
-                  <Copy className="size-3" />
-                  {isAr ? "نسخ الرد" : "Copy"}
-                </button>
-                {conv.channel === "whatsapp" && (
-                  <a
-                    href={`https://wa.me/${phoneE164}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 rounded bg-emerald-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-emerald-500"
-                  >
-                    <ExternalLink className="size-3" />
-                    {isAr ? "فتح المحادثة" : "Open Chat"}
-                  </a>
-                )}
-                {conv.channel === "messenger" && (
-                  <a
-                    href={messengerUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 rounded bg-blue-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-blue-500"
-                  >
-                    <ExternalLink className="size-3" />
-                    {isAr ? "فتح ماسنجر" : "Open Messenger"}
-                  </a>
-                )}
-                {conv.channel === "instagram" && (
-                  <a
-                    href={instagramUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 rounded bg-pink-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-pink-500"
-                  >
-                    <ExternalLink className="size-3" />
-                    {isAr ? "فتح إنستغرام" : "Open Instagram"}
-                  </a>
-                )}
-              </div>
-            </div>
-          ))}
-          {conversations.length === 0 && (
-            <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-              {isAr
-                ? "لن تظهر هنا رسائل إلا بعد ربط WhatsApp Business API أو مصدر رسائل فعلي."
-                : "Messages will appear here only after connecting WhatsApp Business API or another live inbox."}
-            </p>
-          )}
-        </div>
+            )}
+            {staffAuthError && <p className="text-xs text-destructive">{staffAuthError}</p>}
+          </div>
+        )}
       </section>
 
       {/* 3. Official Omnichannel Contact Lines */}
@@ -470,17 +614,17 @@ ${channelContext}
         </div>
       </section>
 
-      {/* 4. Manual On-Demand AI Composer (If you ever want to test or draft manually) */}
+      {/* 4. Interactive AI Composer */}
       <section className="glass space-y-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="font-display text-sm tracking-wider text-primary">
-              {isAr ? "صياغة رد يدوي عند الطلب (Manual AI Draft)" : "Manual On-Demand AI Responder"}
+              {isAr ? "صياغة وتعديل الرد بواسطة كوتش براين" : "Coach Brain Reply Composer"}
             </h3>
             <p className="text-xs text-muted-foreground">
               {isAr
-                ? "إذا رغبت في تجربة استفسار معين وصياغة رد مخصص له في أي وقت:"
-                : "Test any incoming inquiry and draft a tailored reply:"}
+                ? "صياغة رد مخصص لأي استفسار مع إمكانية المراجعة والتعديل قبل النقر للإرسال:"
+                : "Draft a tailored response with full human review before sending:"}
             </p>
           </div>
 
@@ -489,7 +633,7 @@ ${channelContext}
             <button
               type="button"
               onClick={() => setReplyChannel("whatsapp")}
-              className={`rounded px-2.5 py-1 font-medium transition ${
+              className={`rounded px-2.5 py-1 font-medium transition cursor-pointer ${
                 replyChannel === "whatsapp"
                   ? "bg-emerald-600 text-white shadow-sm"
                   : "text-muted-foreground"
@@ -500,7 +644,7 @@ ${channelContext}
             <button
               type="button"
               onClick={() => setReplyChannel("messenger")}
-              className={`rounded px-2.5 py-1 font-medium transition ${
+              className={`rounded px-2.5 py-1 font-medium transition cursor-pointer ${
                 replyChannel === "messenger"
                   ? "bg-blue-600 text-white shadow-sm"
                   : "text-muted-foreground"
@@ -511,7 +655,7 @@ ${channelContext}
             <button
               type="button"
               onClick={() => setReplyChannel("instagram")}
-              className={`rounded px-2.5 py-1 font-medium transition ${
+              className={`rounded px-2.5 py-1 font-medium transition cursor-pointer ${
                 replyChannel === "instagram"
                   ? "bg-pink-600 text-white shadow-sm"
                   : "text-muted-foreground"
@@ -536,9 +680,9 @@ ${channelContext}
           />
 
           <button
-            onClick={generateReplyWithBrain}
+            onClick={() => generateReplyWithBrain()}
             disabled={!clientQuery.trim() || generatingReply}
-            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50 cursor-pointer"
           >
             <Sparkles className={`size-4 ${generatingReply ? "animate-spin" : ""}`} />
             {generatingReply
@@ -555,11 +699,11 @@ ${channelContext}
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-primary">
-                {isAr ? "الرد المقترح:" : "Suggested Reply:"}
+                {isAr ? "الرد المقترح (راجع وعدّل كما تشاء):" : "Suggested Reply (Review & Edit):"}
               </span>
               <button
                 onClick={copyReply}
-                className="flex items-center gap-1 rounded border border-primary/40 px-2 py-1 text-xs hover:bg-primary/10"
+                className="flex items-center gap-1 rounded border border-primary/40 px-2 py-1 text-xs hover:bg-primary/10 cursor-pointer"
               >
                 {copiedReply ? (
                   <Check className="size-3 text-accent" />
@@ -569,7 +713,7 @@ ${channelContext}
                 {copiedReply ? (isAr ? "تم النسخ!" : "Copied!") : isAr ? "نسخ الرد" : "Copy Reply"}
               </button>
             </div>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground bg-background/40 p-3 rounded-lg border border-border">
               {aiSuggestedReply}
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
@@ -584,11 +728,17 @@ ${channelContext}
                   {isAr ? "فتح واتساب بمسودة الرد" : "Open WhatsApp with draft"}
                 </a>
               )}
+              {replyChannel === "whatsapp" && staffSession && selectedConversationId && canSendStaffWhatsApp(staffSession) && (
+                <button type="button" onClick={handleSendStaffReply} className="flex items-center gap-1.5 rounded-md border border-warning/50 bg-warning/10 px-3.5 py-1.5 text-xs font-semibold text-warning hover:bg-warning/20 cursor-pointer">
+                  <ShieldCheck className="size-3.5" />
+                  {isAr ? "إرسال عبر الوظيفة الحالية (Dry-run)" : "Send via existing function (dry-run)"}
+                </button>
+              )}
               {replyChannel === "messenger" && (
                 <button
                   type="button"
                   onClick={openMessengerWithCopy}
-                  className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 shadow-sm"
+                  className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 shadow-sm cursor-pointer"
                 >
                   <ExternalLink className="size-3.5" />
                   {isAr ? "نسخ وفتح مسنجر" : "Open Messenger"}
@@ -598,7 +748,7 @@ ${channelContext}
                 <button
                   type="button"
                   onClick={openInstagramWithCopy}
-                  className="flex items-center gap-1.5 rounded-md bg-pink-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-pink-500 shadow-sm"
+                  className="flex items-center gap-1.5 rounded-md bg-pink-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-pink-500 shadow-sm cursor-pointer"
                 >
                   <ExternalLink className="size-3.5" />
                   {isAr ? "نسخ وفتح إنستغرام" : "Open Instagram DM"}
@@ -629,7 +779,7 @@ ${channelContext}
             <button
               key={tmpl.id}
               onClick={() => handleSelectTemplate(tmpl.id)}
-              className={`rounded-full border px-3 py-1.5 text-xs transition ${
+              className={`rounded-full border px-3 py-1.5 text-xs transition cursor-pointer ${
                 selectedTemplate === tmpl.id
                   ? "border-emerald-500 bg-emerald-500 text-white font-medium"
                   : "border-border text-muted-foreground hover:text-foreground"
@@ -652,7 +802,7 @@ ${channelContext}
           </a>
           <button
             onClick={copyLink}
-            className="flex items-center gap-1.5 rounded-lg border border-border px-3.5 py-2 text-sm hover:bg-secondary"
+            className="flex items-center gap-1.5 rounded-lg border border-border px-3.5 py-2 text-sm hover:bg-secondary cursor-pointer"
           >
             {copiedLink ? (
               <Check className="size-4 text-emerald-400" />
