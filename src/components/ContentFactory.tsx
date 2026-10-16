@@ -665,27 +665,34 @@ function EnhancedPostCard({
       )
     )
       return;
-    let pin = sessionStorage.getItem("owner-pin") || "";
-    if (!pin) pin = window.prompt(isAr ? "أدخل رمز المالك للنشر" : "Enter owner publish PIN") || "";
-    if (!pin) return;
     setMetaBusy(true);
     try {
-      const res = await fetch("/api/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pin,
-          platform: p.platform,
-          caption: p.caption,
-          imageUrl: imageUrl.trim(),
-          idempotencyKey: /^[A-Za-z0-9_-]{4,64}$/.test(p.id) ? p.id : undefined,
-        }),
-      });
-      const data = await res.json();
+      const payload = {
+        platform: p.platform,
+        caption: p.caption,
+        imageUrl: imageUrl.trim(),
+        idempotencyKey: /^[A-Za-z0-9_-]{4,64}$/.test(p.id) ? p.id : undefined,
+      };
+      // The owner session cookie authorizes publishing; the PIN is only asked for when locked
+      // and is never stored in the browser.
+      const send = (pin?: string) =>
+        fetch("/api/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pin ? { ...payload, pin } : payload),
+        });
+      let res = await send();
+      let data = await res.json();
+      if (res.status === 401 && data.error === "owner_session_required") {
+        const pin = window.prompt(isAr ? "أدخل رمز المالك للنشر" : "Enter owner publish PIN") || "";
+        if (!pin) return;
+        res = await send(pin);
+        data = await res.json();
+      }
       if (!res.ok) {
-        if (data.error === "wrong_pin") sessionStorage.removeItem("owner-pin");
         const msgs: Record<string, string> = {
           wrong_pin: isAr ? "رمز المالك غير صحيح" : "Wrong PIN",
+          owner_session_required: isAr ? "يلزم رمز المالك" : "Owner PIN required",
           publish_pin_not_configured: isAr
             ? "لم يتم ضبط رمز المالك بعد"
             : "Owner PIN not set up yet",
@@ -715,7 +722,6 @@ function EnhancedPostCard({
         };
         throw new Error(msgs[data.error] || (isAr ? "خطأ غير معروف" : "Unknown error"));
       }
-      sessionStorage.setItem("owner-pin", pin);
       update(p.id, {
         status: "Published",
         publishedExternalId: data.id,

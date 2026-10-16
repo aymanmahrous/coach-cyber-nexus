@@ -79,19 +79,27 @@ const setSyncState = (s: SyncState) => {
   window.dispatchEvent(new Event(SYNC_EVT));
 };
 
+// Flushes and pulls run one at a time so responses can never be applied out of order.
+let chain: Promise<unknown> = Promise.resolve();
+function exclusive<T>(fn: () => Promise<T>): Promise<T> {
+  const run = chain.then(fn, fn);
+  chain = run.catch(() => {});
+  return run;
+}
+
 /** Send queued local changes. Returns false when the server refused them. */
-async function flush(): Promise<boolean> {
+async function flushNow(): Promise<boolean> {
   const pending = readPending();
-  if (!localStorage.getItem(MIGRATED_KEY)) {
-    // First sync on this device: upload posts that so far lived only here.
-    pending.upserts = [...new Set([...pending.upserts, ...readCache().map((p) => p.id)])];
-  }
   const cache = new Map(readCache().map((p) => [p.id, p]));
-  const upserts = pending.upserts.map((id) => cache.get(id)).filter((p): p is Post => !!p);
-  if (!upserts.length && !pending.deletes.length) {
-    localStorage.setItem(MIGRATED_KEY, "1");
-    return true;
+  if (!localStorage.getItem(MIGRATED_KEY)) {
+    // Until a durable store has confirmed receipt, (re)upload every cached post. This also
+    // re-seeds a non-durable memory store after a server restart.
+    pending.upserts = [...new Set([...pending.upserts, ...cache.keys()])];
   }
+  const upserts = pending.upserts.map((id) => cache.get(id)).filter((p): p is Post => !!p);
+  if (!upserts.length && !pending.deletes.length) return true;
+  // Snapshot of what is sent: a queued id is only cleared if it was not edited meanwhile.
+  const sent = new Map(upserts.map((p) => [p.id, JSON.stringify(p)]));
   const reqs: Promise<Response>[] = [];
   for (let i = 0; i < upserts.length; i += 200)
     reqs.push(
@@ -115,36 +123,45 @@ async function flush(): Promise<boolean> {
     return false;
   }
   const after = readPending();
+  const now = new Map(readCache().map((p) => [p.id, JSON.stringify(p)]));
   writePending({
-    upserts: after.upserts.filter((id) => !pending.upserts.includes(id)),
-    deletes: after.deletes.filter((id) => !pending.deletes.includes(id)),
+    upserts: after.upserts.filter((id) => !sent.has(id) || now.get(id) !== sent.get(id)),
+    deletes: after.deletes.filter((id) => !pending.deletes.includes(id) || now.has(id)),
   });
-  localStorage.setItem(MIGRATED_KEY, "1");
   return true;
 }
 
-/** Push queued changes, then load the server copy (server is the source of truth). */
-async function pull(): Promise<void> {
+/** Push queued changes, then load the server copy. */
+async function pullNow(): Promise<void> {
   try {
-    if (!(await flush())) return;
+    if (!(await flushNow())) return;
     const res = await fetch("/api/posts", { credentials: "same-origin" });
     if (res.status === 401) return setSyncState("locked");
     if (!res.ok) return setSyncState("error");
     const data = (await res.json()) as { posts: Post[]; durable: boolean };
     const server = Array.isArray(data.posts) ? data.posts : [];
-    const pendingUp = new Set(readPending().upserts);
-    const local = readCache().filter((p) => pendingUp.has(p.id));
+    const pending = readPending();
+    const pendingUp = new Set(pending.upserts);
+    const pendingDel = new Set(pending.deletes);
+    // Durable store: it is the source of truth except for unsent local edits.
+    // Memory store: it can lose data on restart, so the browser cache stays authoritative.
+    const local = data.durable ? readCache().filter((p) => pendingUp.has(p.id)) : readCache();
     const localIds = new Set(local.map((p) => p.id));
-    const merged = [...local, ...server.filter((p) => !localIds.has(p.id))].sort((a, b) =>
-      (b.createdAt || "").localeCompare(a.createdAt || ""),
-    );
+    const merged = [
+      ...local,
+      ...server.filter((p) => !localIds.has(p.id) && !pendingDel.has(p.id)),
+    ].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
     writeCache(merged);
+    if (data.durable) localStorage.setItem(MIGRATED_KEY, "1");
     setSyncState(data.durable ? "cloud" : "memory");
     window.dispatchEvent(new Event(EVT));
   } catch {
     setSyncState("error");
   }
 }
+
+const flush = () => exclusive(flushNow);
+const pull = () => exclusive(pullNow);
 
 /** Unlock cloud sync for this browser with the owner PIN (sets an HttpOnly session cookie). */
 export async function unlockOwnerSession(pin: string): Promise<{ ok: boolean; error?: string }> {
@@ -180,7 +197,17 @@ export function usePosts() {
     window.addEventListener("storage", fromCache);
     window.addEventListener(SYNC_EVT, onSync);
     window.addEventListener("owner-session-change", onSession);
+    // Retry queued offline edits when connectivity returns, plus a slow periodic retry.
+    const retry = () => {
+      const p = readPending();
+      if (syncState === "error" && (p.upserts.length || p.deletes.length)) void pull();
+    };
+    const onOnline = () => void pull();
+    window.addEventListener("online", onOnline);
+    const timer = window.setInterval(retry, 30_000);
     return () => {
+      window.removeEventListener("online", onOnline);
+      window.clearInterval(timer);
       window.removeEventListener(EVT, fromCache);
       window.removeEventListener("storage", fromCache);
       window.removeEventListener(SYNC_EVT, onSync);

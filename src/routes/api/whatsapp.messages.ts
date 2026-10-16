@@ -5,6 +5,8 @@ import { isOwner, json, unauthorized } from "@/lib/owner-auth";
 import { getStore } from "@/lib/store";
 import { readWhatsAppConfig, type WaMessage } from "@/lib/whatsapp";
 
+const PAGE = 300;
+
 const SendBody = z.object({
   to: z.string().regex(/^\d{8,15}$/),
   text: z.string().trim().min(1).max(4096),
@@ -18,8 +20,15 @@ export const Route = createFileRoute("/api/whatsapp/messages")({
         if (!isOwner(request)) return unauthorized();
         const store = getStore();
         try {
-          const rows = await store.table("wa_messages").list<WaMessage>(300);
-          return json({ messages: rows.map((r) => r.payload), durable: store.durable });
+          const raw = Number(new URL(request.url).searchParams.get("offset"));
+          const offset = Number.isInteger(raw) && raw > 0 ? Math.min(raw, 1_000_000) : 0;
+          const rows = await store.table("wa_messages").list<WaMessage>(PAGE + 1, offset);
+          return json({
+            messages: rows.slice(0, PAGE).map((r) => r.payload),
+            hasMore: rows.length > PAGE,
+            nextOffset: offset + PAGE,
+            durable: store.durable,
+          });
         } catch {
           return json({ error: "store_unavailable" }, 503);
         }
@@ -79,11 +88,21 @@ export const Route = createFileRoute("/api/whatsapp/messages")({
           text,
           timestamp: new Date().toISOString(),
         };
-        await getStore()
-          .table("wa_messages")
-          .upsert([{ id, payload: msg }])
-          .catch(() => {});
-        return json({ ok: true, id });
+        // The message is already sent: never report failure (a resend would duplicate it),
+        // but retry the inbox write and tell the client if it still was not saved.
+        let stored = false;
+        for (let attempt = 0; attempt < 3 && !stored; attempt++) {
+          try {
+            await getStore()
+              .table("wa_messages")
+              .upsert([{ id, payload: msg }]);
+            stored = true;
+          } catch {
+            if (attempt < 2) await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+          }
+        }
+        if (!stored) console.error(`[whatsapp] sent message not stored id=${id}`);
+        return json({ ok: true, id, stored, message: msg });
       },
     },
   },

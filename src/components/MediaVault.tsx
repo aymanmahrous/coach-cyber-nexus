@@ -81,28 +81,38 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/canva")
-      .then((r) => {
-        if (!r.ok) throw new Error(`Canva status request failed (${r.status})`);
-        return r.json();
-      })
-      .then((data) => {
-        if (data && typeof data.configured === "boolean") {
-          if (active)
-            setCanvaConfig({
-              configured: data.configured,
-              brandTemplateId: typeof data.brandTemplateId === "string" ? data.brandTemplateId : "",
-              status: canvaStatus(data),
-            });
-        } else if (active) {
-          setCanvaStatusError(true);
-        }
-      })
-      .catch(() => {
-        if (active) setCanvaStatusError(true);
-      });
+    const load = () =>
+      fetch("/api/canva")
+        .then((r) => {
+          if (!r.ok) throw new Error(`Canva status request failed (${r.status})`);
+          return r.json();
+        })
+        .then((data) => {
+          if (data && typeof data.configured === "boolean") {
+            if (active)
+              setCanvaConfig({
+                configured: data.configured,
+                brandTemplateId:
+                  typeof data.brandTemplateId === "string" ? data.brandTemplateId : "",
+                status: canvaStatus(data),
+              });
+          } else if (active) {
+            setCanvaStatusError(true);
+          }
+        })
+        .catch(() => {
+          if (active) setCanvaStatusError(true);
+        });
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    void load();
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       active = false;
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 

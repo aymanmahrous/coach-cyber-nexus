@@ -45,6 +45,14 @@ describe("memory store", () => {
     ]);
     await posts.remove(["a"]);
     expect((await posts.list()).map((r) => r.id)).toEqual(["b"]);
+    await posts.upsert([
+      { id: "c", payload: 3 },
+      { id: "d", payload: 4 },
+    ]);
+    const page1 = await posts.list(2, 0);
+    const page2 = await posts.list(2, 2);
+    expect(new Set([...page1, ...page2].map((r) => r.id))).toEqual(new Set(["b", "c", "d"]));
+    expect(page1.length + page2.length).toBe(3);
   });
 });
 

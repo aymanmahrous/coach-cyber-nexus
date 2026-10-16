@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { isSafeImageUrl, withTimeout } from "@/lib/integration-guards";
-import { checkPin, json, pinConfigState } from "@/lib/owner-auth";
+import { checkPin, isOwner, json, pinConfigState } from "@/lib/owner-auth";
 import { getStore } from "@/lib/store";
 
 /**
@@ -18,7 +18,7 @@ const DEDUPE_TTL_MS = 24 * 60 * 60 * 1000;
 const META_TIMEOUT_MS = 20_000;
 
 const Body = z.object({
-  pin: z.string().min(1).max(128),
+  pin: z.string().min(1).max(128).optional(),
   platform: z.enum(["facebook", "instagram"]),
   caption: z.string().trim().min(1).max(2200),
   imageUrl: z
@@ -92,11 +92,15 @@ export const Route = createFileRoute("/api/publish")({
         const c = readConfig();
 
         const store = getStore();
-        let pinResult;
-        try {
-          pinResult = await checkPin(request, pin, { store });
-        } catch {
-          return json({ error: "store_unavailable" }, 503);
+        // An unlocked owner session authorizes publishing; otherwise the PIN is required.
+        let pinResult: Awaited<ReturnType<typeof checkPin>> = "ok";
+        if (!isOwner(request)) {
+          if (!pin) return json({ error: "owner_session_required" }, 401);
+          try {
+            pinResult = await checkPin(request, pin, { store });
+          } catch {
+            return json({ error: "store_unavailable" }, 503);
+          }
         }
         if (pinResult !== "ok") {
           const status =

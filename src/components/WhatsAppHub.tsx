@@ -38,7 +38,7 @@ interface LiveConversation {
 }
 
 type InboxResult =
-  | { state: "ok"; messages: WaMessage[]; durable: boolean }
+  | { state: "ok"; messages: WaMessage[]; durable: boolean; hasMore: boolean; nextOffset: number }
   | { state: "locked" }
   | { state: "error" };
 
@@ -47,8 +47,19 @@ async function fetchInbox(): Promise<InboxResult> {
   if (!res) return { state: "error" };
   if (res.status === 401) return { state: "locked" };
   if (!res.ok) return { state: "error" };
-  const data = (await res.json()) as { messages: WaMessage[]; durable: boolean };
-  return { state: "ok", messages: data.messages ?? [], durable: !!data.durable };
+  const data = (await res.json()) as {
+    messages: WaMessage[];
+    durable: boolean;
+    hasMore?: boolean;
+    nextOffset?: number;
+  };
+  return {
+    state: "ok",
+    messages: data.messages ?? [],
+    durable: !!data.durable,
+    hasMore: !!data.hasMore,
+    nextOffset: data.nextOffset ?? 0,
+  };
 }
 
 function groupConversations(messages: WaMessage[]): LiveConversation[] {
@@ -114,10 +125,41 @@ export function WhatsAppHub({ lang, log }: WhatsAppHubProps) {
     refetchInterval: (q) => (q.state.data?.state === "ok" ? 15_000 : false),
     refetchOnWindowFocus: true,
   });
-  const conversations = useMemo(
-    () => (inbox.data?.state === "ok" ? groupConversations(inbox.data.messages) : []),
-    [inbox.data],
-  );
+  // Older pages and sent-but-unsaved replies are kept client-side and merged by message id.
+  const [older, setOlder] = useState<{ messages: WaMessage[]; next: number; hasMore: boolean }>();
+  const [unsaved, setUnsaved] = useState<WaMessage[]>([]);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const conversations = useMemo(() => {
+    if (inbox.data?.state !== "ok") return [];
+    const byId = new Map<string, WaMessage>();
+    for (const m of [...unsaved, ...(older?.messages ?? []), ...inbox.data.messages])
+      byId.set(m.id, m);
+    return groupConversations([...byId.values()]);
+  }, [inbox.data, older, unsaved]);
+  const hasMore = older ? older.hasMore : inbox.data?.state === "ok" && inbox.data.hasMore;
+  const loadOlder = async () => {
+    if (inbox.data?.state !== "ok") return;
+    const offset = older?.next ?? inbox.data.nextOffset;
+    setLoadingOlder(true);
+    try {
+      const res = await fetch(`/api/whatsapp/messages?offset=${offset}`);
+      if (!res.ok) throw new Error(String(res.status));
+      const data = (await res.json()) as {
+        messages: WaMessage[];
+        hasMore: boolean;
+        nextOffset: number;
+      };
+      setOlder((o) => ({
+        messages: [...(o?.messages ?? []), ...(data.messages ?? [])],
+        next: data.nextOffset,
+        hasMore: !!data.hasMore,
+      }));
+    } catch {
+      log(isAr ? "تعذّر تحميل الرسائل الأقدم" : "Could not load older messages", "err");
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const send = useMutation({
     mutationFn: async ({ to, text }: { to: string; text: string }) => {
@@ -126,12 +168,28 @@ export function WhatsAppHub({ lang, log }: WhatsAppHubProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ to, text }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        stored?: boolean;
+        message?: WaMessage;
+      };
       if (!res.ok) throw new Error(data.error || "whatsapp_send_failed");
+      return data;
     },
-    onSuccess: (_d, v) => {
+    onSuccess: (data, v) => {
       setDrafts((d) => ({ ...d, [v.to]: "" }));
-      log(isAr ? "تم إرسال الرد عبر واتساب" : "Reply sent via WhatsApp", "ok");
+      if (data.stored === false && data.message) {
+        const sent = data.message;
+        setUnsaved((u) => [...u, sent]);
+        log(
+          isAr
+            ? "تم إرسال الرد لكن تعذّر حفظه في صندوق الوارد — لا تعِد إرساله"
+            : "Reply sent but not saved to the inbox — do not resend",
+          "err",
+        );
+      } else {
+        log(isAr ? "تم إرسال الرد عبر واتساب" : "Reply sent via WhatsApp", "ok");
+      }
       void queryClient.invalidateQueries({ queryKey: ["whatsapp-inbox"] });
     },
     onError: (e: Error) => {
@@ -479,6 +537,22 @@ ${channelContext}
               </div>
             </div>
           ))}
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => void loadOlder()}
+              disabled={loadingOlder}
+              className="w-full rounded-lg border border-border py-2 text-xs text-muted-foreground hover:border-primary/50 disabled:opacity-50"
+            >
+              {loadingOlder
+                ? isAr
+                  ? "جارٍ التحميل…"
+                  : "Loading…"
+                : isAr
+                  ? "تحميل محادثات أقدم"
+                  : "Load older conversations"}
+            </button>
+          )}
           {conversations.length === 0 && (
             <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
               {inbox.data?.state === "ok"

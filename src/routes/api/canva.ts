@@ -166,10 +166,10 @@ function readCookie(request: Request, name: string): string | undefined {
 }
 
 function appendOauthCookie(response: Response, request: Request, name: string, value: string) {
-  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
+  void request;
   response.headers.append(
     "Set-Cookie",
-    `${name}=${encodeURIComponent(value)}; HttpOnly; SameSite=Lax; Path=/api/canva; Max-Age=${OAUTH_STATE_MAX_AGE}${secure}`,
+    `${name}=${encodeURIComponent(value)}; HttpOnly; Secure; SameSite=Lax; Path=/api/canva; Max-Age=${OAUTH_STATE_MAX_AGE}`,
   );
 }
 
@@ -177,9 +177,7 @@ function clearOauthCookie(response: Response, request: Request, state: string) {
   if (!/^[A-Za-z0-9_-]{20,64}$/.test(state)) return;
   response.headers.append(
     "Set-Cookie",
-    `${oauthCookieName(state)}=; HttpOnly; SameSite=Lax; Path=/api/canva; Max-Age=0${
-      new URL(request.url).protocol === "https:" ? "; Secure" : ""
-    }`,
+    `${oauthCookieName(state)}=; HttpOnly; Secure; SameSite=Lax; Path=/api/canva; Max-Age=0`,
   );
 }
 
@@ -235,6 +233,16 @@ export const Route = createFileRoute("/api/canva")({
 
           if (!code) {
             const response = Response.redirect(`${clientOrigin}/?canva_status=missing_code`, 302);
+            if (state) clearOauthCookie(response, request, state);
+            return response;
+          }
+
+          // The owner session must still be valid when the flow completes.
+          if (!isOwner(request)) {
+            const response = Response.redirect(
+              `${clientOrigin}/?canva_status=owner_session_required`,
+              302,
+            );
             if (state) clearOauthCookie(response, request, state);
             return response;
           }

@@ -107,10 +107,11 @@ export function isOwner(request: Request) {
 }
 
 export function sessionCookieHeader(request: Request, value: string | null) {
-  const secure = new URL(request.url).protocol === "https:" ? "; Secure" : "";
-  return `${SESSION_COOKIE}=${value ?? ""}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${
+  void request;
+  // Lax (not Strict) so the cookie reaches the Canva OAuth callback; all mutations are non-GET.
+  return `${SESSION_COOKIE}=${value ?? ""}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${
     value ? SESSION_MAX_AGE_S : 0
-  }${secure}`;
+  }`;
 }
 
 export const json = (body: unknown, status = 200) =>

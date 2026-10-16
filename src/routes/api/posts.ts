@@ -18,6 +18,8 @@ const UpsertBody = z.object({ posts: z.array(PostSchema).min(1).max(200) });
 const PutBody = z.object({ post: PostSchema });
 const IdSchema = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/);
 
+const PAGE = 1000;
+
 const storeError = () => json({ error: "store_unavailable" }, 503);
 
 export const Route = createFileRoute("/api/posts")({
@@ -27,8 +29,13 @@ export const Route = createFileRoute("/api/posts")({
         if (!isOwner(request)) return unauthorized();
         const store = getStore();
         try {
-          const rows = await store.table("posts").list(500);
-          return json({ posts: rows.map((r) => r.payload), durable: store.durable });
+          const posts: unknown[] = [];
+          for (let offset = 0; ; offset += PAGE) {
+            const rows = await store.table("posts").list(PAGE, offset);
+            posts.push(...rows.map((r) => r.payload));
+            if (rows.length < PAGE) break;
+          }
+          return json({ posts, durable: store.durable });
         } catch {
           return storeError();
         }

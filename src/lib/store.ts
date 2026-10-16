@@ -10,7 +10,7 @@
 export type Doc<T = unknown> = { id: string; payload: T; created_at: string };
 
 export interface DocTable {
-  list<T>(limit?: number): Promise<Doc<T>[]>;
+  list<T>(limit?: number, offset?: number): Promise<Doc<T>[]>;
   upsert<T>(rows: { id: string; payload: T }[]): Promise<void>;
   remove(ids: string[]): Promise<void>;
 }
@@ -74,10 +74,10 @@ export function createMemoryStore(now: () => number = Date.now): Store {
       if (!t) tables.set(name, (t = new Map()));
       const rows = t;
       return {
-        async list<T>(limit = 500) {
+        async list<T>(limit = 500, offset = 0) {
           return [...rows.values()]
-            .sort((a, b) => b.created_at.localeCompare(a.created_at))
-            .slice(0, limit) as Doc<T>[];
+            .sort((a, b) => b.created_at.localeCompare(a.created_at) || a.id.localeCompare(b.id))
+            .slice(offset, offset + limit) as Doc<T>[];
         },
         async upsert(items) {
           for (const r of items) {
@@ -165,9 +165,9 @@ export function createSupabaseStore(
     },
     table(name) {
       return {
-        async list<T>(limit = 500) {
+        async list<T>(limit = 500, offset = 0) {
           return ((await call(
-            `${name}?select=id,payload,created_at&order=created_at.desc&limit=${limit}`,
+            `${name}?select=id,payload,created_at&order=created_at.desc,id.asc&limit=${limit}&offset=${offset}`,
           )) ?? []) as Doc<T>[];
         },
         async upsert(rows) {
