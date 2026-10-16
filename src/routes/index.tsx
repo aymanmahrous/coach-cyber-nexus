@@ -5,6 +5,7 @@ import { ContentFactory } from "@/components/ContentFactory";
 import { WhatsAppHub } from "@/components/WhatsAppHub";
 import { MediaVault } from "@/components/MediaVault";
 import { usePosts } from "@/lib/posts";
+import { canvaStatus } from "@/lib/integration-guards";
 import {
   Activity,
   Bell,
@@ -59,6 +60,10 @@ const T = {
     offline: "غير مهيأ",
     ready: "لم يُتحقق بعد",
     configured: "مُهيأ / لم يُتحقق",
+    verified: "متحقق",
+    live: "مباشر",
+    limited: "محدود",
+    cloud: "التخزين السحابي",
     noCheck: "لا يوجد فحص",
     checking: "جارٍ الفحص…",
     notif: "مركز الإشعارات",
@@ -135,6 +140,10 @@ const T = {
     offline: "Not configured",
     ready: "Not verified yet",
     configured: "Configured / unverified",
+    verified: "Verified",
+    live: "Live",
+    limited: "Limited",
+    cloud: "Cloud storage",
     noCheck: "No check available",
     checking: "Checking…",
     notif: "Notification Center",
@@ -238,28 +247,56 @@ function Cockpit() {
       ].slice(0, 50),
     );
 
-  // Configuration status only (no live connection checks exist yet).
-  type Cfg = "checking" | "configured" | "off" | "nocheck";
-  const [cfg, setCfg] = useState<{ fb: Cfg; ig: Cfg; canva: Cfg }>({
+  // Integration status: "verified"/"live" only when the server confirms it.
+  type Cfg = "checking" | "configured" | "off" | "nocheck" | "verified" | "live" | "limited";
+  const [cfg, setCfg] = useState<{ fb: Cfg; ig: Cfg; canva: Cfg; wa: Cfg; cloud: Cfg }>({
     fb: "checking",
     ig: "checking",
     canva: "checking",
+    wa: "checking",
+    cloud: "checking",
   });
   useEffect(() => {
     let alive = true;
     const map = (v: unknown): Cfg =>
       v === "configured_unverified" ? "configured" : v === "not_configured" ? "off" : "nocheck";
+    const get = (u: string) => fetch(u).then((r) => (r.ok ? r.json() : Promise.reject()));
     Promise.allSettled([
-      fetch("/api/publish").then((r) => (r.ok ? r.json() : Promise.reject())),
-      fetch("/api/canva").then((r) => (r.ok ? r.json() : Promise.reject())),
-    ]).then(([pub, cv]) => {
+      get("/api/publish"),
+      get("/api/canva"),
+      get("/api/whatsapp"),
+      get("/api/session"),
+    ]).then(([pub, cv, wa, ses]) => {
       if (!alive) return;
       const p = pub.status === "fulfilled" ? pub.value : null;
       const c = cv.status === "fulfilled" ? cv.value : null;
+      const w = wa.status === "fulfilled" ? wa.value : null;
+      const s = ses.status === "fulfilled" ? ses.value : null;
+      const canva = c ? canvaStatus(c) : "blocked";
       setCfg({
         fb: p ? map(p.facebook) : "nocheck",
         ig: p ? map(p.instagram) : "nocheck",
-        canva: c ? (c.configured ? "configured" : "off") : "nocheck",
+        canva:
+          canva === "verified"
+            ? "verified"
+            : canva === "limited"
+              ? "limited"
+              : canva === "configured_unverified"
+                ? "configured"
+                : canva === "needs_setup"
+                  ? "off"
+                  : "nocheck",
+        // "live" requires a configured, signed webhook AND a durable inbox.
+        wa: !w
+          ? "nocheck"
+          : w.webhook !== "configured"
+            ? "off"
+            : !w.durable
+              ? "limited"
+              : w.lastInboundAt
+                ? "live"
+                : "configured",
+        cloud: !s ? "nocheck" : s.durableStore ? "verified" : "limited",
       });
     });
     return () => {
@@ -267,20 +304,27 @@ function Cockpit() {
     };
   }, []);
   const channels: { name: string; st: Cfg }[] = [
-    { name: isAr ? "واتساب" : "WhatsApp", st: "nocheck" },
+    { name: t.cloud, st: cfg.cloud },
+    { name: isAr ? "واتساب" : "WhatsApp", st: cfg.wa },
     { name: isAr ? "فيسبوك" : "Facebook", st: cfg.fb },
     { name: isAr ? "إنستغرام" : "Instagram", st: cfg.ig },
     { name: "TikTok", st: "nocheck" },
     { name: "Canva", st: cfg.canva },
   ];
   const cfgLabel = (st: Cfg) =>
-    st === "configured"
-      ? t.configured
-      : st === "off"
-        ? t.offline
-        : st === "checking"
-          ? t.checking
-          : t.noCheck;
+    st === "verified"
+      ? t.verified
+      : st === "live"
+        ? t.live
+        : st === "limited"
+          ? t.limited
+          : st === "configured"
+            ? t.configured
+            : st === "off"
+              ? t.offline
+              : st === "checking"
+                ? t.checking
+                : t.noCheck;
 
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 p-3 md:p-6">
@@ -303,7 +347,13 @@ function Cockpit() {
               className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-muted-foreground"
             >
               <span
-                className={`size-2 rounded-full ${c.st === "configured" ? "bg-warning" : "bg-muted-foreground/50"}`}
+                className={`size-2 rounded-full ${
+                  c.st === "verified" || c.st === "live"
+                    ? "bg-accent"
+                    : c.st === "configured" || c.st === "limited"
+                      ? "bg-warning"
+                      : "bg-muted-foreground/50"
+                }`}
               />
               {c.name} · {cfgLabel(c.st)}
             </span>

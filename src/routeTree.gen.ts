@@ -12,7 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiBrainRouteImport } from './routes/api/brain'
 import { Route as ApiCanvaRouteImport } from './routes/api/canva'
+import { Route as ApiPostsRouteImport } from './routes/api/posts'
 import { Route as ApiPublishRouteImport } from './routes/api/publish'
+import { Route as ApiSessionRouteImport } from './routes/api/session'
+import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
+import { Route as ApiWhatsappMessagesRouteImport } from './routes/api/whatsapp.messages'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -29,44 +33,104 @@ const ApiCanvaRoute = ApiCanvaRouteImport.update({
   path: '/api/canva',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPostsRoute = ApiPostsRouteImport.update({
+  id: '/api/posts',
+  path: '/api/posts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublishRoute = ApiPublishRouteImport.update({
   id: '/api/publish',
   path: '/api/publish',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSessionRoute = ApiSessionRouteImport.update({
+  id: '/api/session',
+  path: '/api/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWhatsappRoute = ApiWhatsappRouteImport.update({
+  id: '/api/whatsapp',
+  path: '/api/whatsapp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWhatsappMessagesRoute = ApiWhatsappMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => ApiWhatsappRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/brain': typeof ApiBrainRoute
   '/api/canva': typeof ApiCanvaRoute
+  '/api/posts': typeof ApiPostsRoute
   '/api/publish': typeof ApiPublishRoute
+  '/api/session': typeof ApiSessionRoute
+  '/api/whatsapp': typeof ApiWhatsappRouteWithChildren
+  '/api/whatsapp/messages': typeof ApiWhatsappMessagesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/brain': typeof ApiBrainRoute
   '/api/canva': typeof ApiCanvaRoute
+  '/api/posts': typeof ApiPostsRoute
   '/api/publish': typeof ApiPublishRoute
+  '/api/session': typeof ApiSessionRoute
+  '/api/whatsapp': typeof ApiWhatsappRouteWithChildren
+  '/api/whatsapp/messages': typeof ApiWhatsappMessagesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/brain': typeof ApiBrainRoute
   '/api/canva': typeof ApiCanvaRoute
+  '/api/posts': typeof ApiPostsRoute
   '/api/publish': typeof ApiPublishRoute
+  '/api/session': typeof ApiSessionRoute
+  '/api/whatsapp': typeof ApiWhatsappRouteWithChildren
+  '/api/whatsapp/messages': typeof ApiWhatsappMessagesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/brain' | '/api/canva' | '/api/publish'
+  fullPaths:
+    | '/'
+    | '/api/brain'
+    | '/api/canva'
+    | '/api/posts'
+    | '/api/publish'
+    | '/api/session'
+    | '/api/whatsapp'
+    | '/api/whatsapp/messages'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/brain' | '/api/canva' | '/api/publish'
-  id: '__root__' | '/' | '/api/brain' | '/api/canva' | '/api/publish'
+  to:
+    | '/'
+    | '/api/brain'
+    | '/api/canva'
+    | '/api/posts'
+    | '/api/publish'
+    | '/api/session'
+    | '/api/whatsapp'
+    | '/api/whatsapp/messages'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/brain'
+    | '/api/canva'
+    | '/api/posts'
+    | '/api/publish'
+    | '/api/session'
+    | '/api/whatsapp'
+    | '/api/whatsapp/messages'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiBrainRoute: typeof ApiBrainRoute
   ApiCanvaRoute: typeof ApiCanvaRoute
+  ApiPostsRoute: typeof ApiPostsRoute
   ApiPublishRoute: typeof ApiPublishRoute
+  ApiSessionRoute: typeof ApiSessionRoute
+  ApiWhatsappRoute: typeof ApiWhatsappRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -92,6 +156,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCanvaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/posts': {
+      id: '/api/posts'
+      path: '/api/posts'
+      fullPath: '/api/posts'
+      preLoaderRoute: typeof ApiPostsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/publish': {
       id: '/api/publish'
       path: '/api/publish'
@@ -99,14 +170,50 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublishRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/session': {
+      id: '/api/session'
+      path: '/api/session'
+      fullPath: '/api/session'
+      preLoaderRoute: typeof ApiSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/whatsapp': {
+      id: '/api/whatsapp'
+      path: '/api/whatsapp'
+      fullPath: '/api/whatsapp'
+      preLoaderRoute: typeof ApiWhatsappRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/whatsapp/messages': {
+      id: '/api/whatsapp/messages'
+      path: '/messages'
+      fullPath: '/api/whatsapp/messages'
+      preLoaderRoute: typeof ApiWhatsappMessagesRouteImport
+      parentRoute: typeof ApiWhatsappRoute
+    }
   }
 }
+
+interface ApiWhatsappRouteChildren {
+  ApiWhatsappMessagesRoute: typeof ApiWhatsappMessagesRoute
+}
+
+const ApiWhatsappRouteChildren: ApiWhatsappRouteChildren = {
+  ApiWhatsappMessagesRoute: ApiWhatsappMessagesRoute,
+}
+
+const ApiWhatsappRouteWithChildren = ApiWhatsappRoute._addFileChildren(
+  ApiWhatsappRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiBrainRoute: ApiBrainRoute,
   ApiCanvaRoute: ApiCanvaRoute,
+  ApiPostsRoute: ApiPostsRoute,
   ApiPublishRoute: ApiPublishRoute,
+  ApiSessionRoute: ApiSessionRoute,
+  ApiWhatsappRoute: ApiWhatsappRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

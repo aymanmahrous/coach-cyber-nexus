@@ -26,12 +26,21 @@ export function isSafeImageUrl(raw: string): boolean {
 export type IntegrationStatus =
   "verified" | "configured_unverified" | "needs_setup" | "blocked" | "limited";
 
-/** Canva: a token held only in one worker's memory is "limited", never "verified". */
+/**
+ * Canva: "verified" only when the token is stored durably AND a live Canva API
+ * call succeeded. A token held only in one instance's memory is "limited".
+ */
 export function canvaStatus(data: unknown): IntegrationStatus {
   if (!data || typeof data !== "object") return "blocked";
-  const d = data as { configured?: unknown; connectedThisInstance?: unknown };
+  const d = data as {
+    configured?: unknown;
+    connected?: unknown;
+    verified?: unknown;
+    durable?: unknown;
+  };
   if (d.configured !== true) return "needs_setup";
-  return d.connectedThisInstance === true ? "limited" : "configured_unverified";
+  if (d.connected !== true) return "configured_unverified";
+  return d.verified === true && d.durable === true ? "verified" : "limited";
 }
 
 /** Timeout signal combined with an optional caller signal. */

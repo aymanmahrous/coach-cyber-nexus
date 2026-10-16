@@ -16,7 +16,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import { z } from "zod";
-import { usePosts, type Platform, type Post } from "@/lib/posts";
+import { unlockOwnerSession, usePosts, type Platform, type Post } from "@/lib/posts";
 import { BrandedPosterStudio } from "./BrandedPosterStudio";
 
 type Lang = "ar" | "en";
@@ -127,7 +127,7 @@ const L = {
     visual: "موجز التصميم وهوية القالب",
     templateLabel: "نوع القالب والتصميم:",
     guard:
-      "حماية الأكاديمية: لا يتم النشر أو سحب رصيد تلقائياً. الخطط والمنشورات تُحفظ على هذا الجهاز فقط؛ لا تُجدول أو تُنشر على المنصات إلا بعد ربط الحسابات وموافقتك اليدوية.",
+      "حماية الأكاديمية: لا يتم النشر أو سحب رصيد تلقائياً. الخطط والمنشورات تُحفظ في التخزين السحابي عند فتح جلسة المالك (وإلا على هذا الجهاز)؛ لا تُجدول أو تُنشر على المنصات إلا بعد ربط الحسابات وموافقتك اليدوية.",
     err: "تعذر التوليد",
     needWhen: "حدد موعد وتاريخ النشر أولاً",
     fbPage: "صفحة فيسبوك: 1164107840123575",
@@ -172,7 +172,7 @@ const L = {
     visual: "Visual Style & Brief",
     templateLabel: "Template Style:",
     guard:
-      "Academy Protection: No automatic publishing or ad spend. Plans and posts are saved on this device only; they are not scheduled on social platforms unless accounts are connected and you manually approve.",
+      "Academy Protection: No automatic publishing or ad spend. Plans and posts sync to cloud storage once the owner session is unlocked (otherwise this device only); they are not scheduled on social platforms unless accounts are connected and you manually approve.",
     err: "Generation failed",
     needWhen: "Select publish time first",
     fbPage: "Facebook Page: 1164107840123575",
@@ -196,7 +196,25 @@ export function ContentFactory({
   log: (s: string, tone?: "info" | "ok" | "err") => void;
 }) {
   const t = L[lang];
-  const { posts, save } = usePosts();
+  const { posts, save, sync } = usePosts();
+  const unlockSync = async () => {
+    const pin =
+      window.prompt(
+        lang === "ar" ? "أدخل رمز المالك لتفعيل المزامنة" : "Enter owner PIN to enable sync",
+      ) || "";
+    if (!pin) return;
+    const r = await unlockOwnerSession(pin);
+    log(
+      r.ok
+        ? lang === "ar"
+          ? "تم تفعيل المزامنة السحابية"
+          : "Cloud sync unlocked"
+        : lang === "ar"
+          ? "تعذّر فتح جلسة المالك"
+          : `Owner unlock failed (${r.error})`,
+      r.ok ? "ok" : "err",
+    );
+  };
   const [plan, setPlan] = useState<Plan>("3days");
   const [plats, setPlats] = useState<Platform[]>(["instagram", "facebook"]);
   const [topic, setTopic] = useState("");
@@ -487,6 +505,41 @@ Return ONLY valid JSON matching this structure:
         <p className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning leading-relaxed">
           {t.guard}
         </p>
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+        >
+          <span>
+            {sync === "cloud"
+              ? lang === "ar"
+                ? "المنشورات متزامنة مع التخزين السحابي"
+                : "Posts synced to cloud storage"
+              : sync === "memory"
+                ? lang === "ar"
+                  ? "الخادم بدون تخزين دائم — المنشورات محفوظة على هذا الجهاز"
+                  : "Server has no durable storage — posts kept on this device"
+                : sync === "locked"
+                  ? lang === "ar"
+                    ? "المزامنة مقفلة — المنشورات محفوظة على هذا الجهاز"
+                    : "Sync locked — posts kept on this device"
+                  : sync === "error"
+                    ? lang === "ar"
+                      ? "تعذّر الاتصال بالخادم — المنشورات محفوظة على هذا الجهاز"
+                      : "Server unreachable — posts kept on this device"
+                    : lang === "ar"
+                      ? "جارٍ المزامنة…"
+                      : "Syncing…"}
+          </span>
+          {sync === "locked" && (
+            <button
+              type="button"
+              onClick={unlockSync}
+              className="rounded border border-primary/40 px-2 py-0.5 text-[11px] text-primary hover:bg-primary/10"
+            >
+              {lang === "ar" ? "تفعيل المزامنة" : "Unlock sync"}
+            </button>
+          )}
+        </div>
       </section>
 
       {/* Posts Groups */}
@@ -612,27 +665,34 @@ function EnhancedPostCard({
       )
     )
       return;
-    let pin = sessionStorage.getItem("owner-pin") || "";
-    if (!pin) pin = window.prompt(isAr ? "أدخل رمز المالك للنشر" : "Enter owner publish PIN") || "";
-    if (!pin) return;
     setMetaBusy(true);
     try {
-      const res = await fetch("/api/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pin,
-          platform: p.platform,
-          caption: p.caption,
-          imageUrl: imageUrl.trim(),
-          idempotencyKey: /^[A-Za-z0-9_-]{4,64}$/.test(p.id) ? p.id : undefined,
-        }),
-      });
-      const data = await res.json();
+      const payload = {
+        platform: p.platform,
+        caption: p.caption,
+        imageUrl: imageUrl.trim(),
+        idempotencyKey: /^[A-Za-z0-9_-]{4,64}$/.test(p.id) ? p.id : undefined,
+      };
+      // The owner session cookie authorizes publishing; the PIN is only asked for when locked
+      // and is never stored in the browser.
+      const send = (pin?: string) =>
+        fetch("/api/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(pin ? { ...payload, pin } : payload),
+        });
+      let res = await send();
+      let data = await res.json();
+      if (res.status === 401 && data.error === "owner_session_required") {
+        const pin = window.prompt(isAr ? "أدخل رمز المالك للنشر" : "Enter owner publish PIN") || "";
+        if (!pin) return;
+        res = await send(pin);
+        data = await res.json();
+      }
       if (!res.ok) {
-        if (data.error === "wrong_pin") sessionStorage.removeItem("owner-pin");
         const msgs: Record<string, string> = {
           wrong_pin: isAr ? "رمز المالك غير صحيح" : "Wrong PIN",
+          owner_session_required: isAr ? "يلزم رمز المالك" : "Owner PIN required",
           publish_pin_not_configured: isAr
             ? "لم يتم ضبط رمز المالك بعد"
             : "Owner PIN not set up yet",
@@ -662,7 +722,6 @@ function EnhancedPostCard({
         };
         throw new Error(msgs[data.error] || (isAr ? "خطأ غير معروف" : "Unknown error"));
       }
-      sessionStorage.setItem("owner-pin", pin);
       update(p.id, {
         status: "Published",
         publishedExternalId: data.id,
