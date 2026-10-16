@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { z } from "zod";
 import { usePosts, type Platform, type Post } from "@/lib/posts";
+import type { OfficialStaffSession } from "@/lib/official-auth";
 import { BrandedPosterStudio } from "./BrandedPosterStudio";
 
 type Lang = "ar" | "en";
@@ -191,12 +192,14 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 export function ContentFactory({
   lang,
   log,
+  session,
 }: {
   lang: Lang;
   log: (s: string, tone?: "info" | "ok" | "err") => void;
+  session: OfficialStaffSession;
 }) {
   const t = L[lang];
-  const { posts, save } = usePosts();
+  const { posts, save } = usePosts(session);
   const [plan, setPlan] = useState<Plan>("3days");
   const [plats, setPlats] = useState<Platform[]>(["instagram", "facebook"]);
   const [topic, setTopic] = useState("");
