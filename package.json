@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "preview": "nitro preview",
     "lint": "eslint .",
+    "test": "vitest run",
     "format": "prettier --write .",
     "deploy": "npm run build && npx nitro deploy --prebuilt",
     "deploy:cloudflare": "npm run build && npx nitro deploy --prebuilt"

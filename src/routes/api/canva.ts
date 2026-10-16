@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import crypto from "node:crypto";
+import { isOwner, unauthorized } from "@/lib/owner-auth";
+import { getStore } from "@/lib/store";
 
 const CANVA_CLIENT_ID = (process.env["CANVA_CLIENT_ID"] || "").trim();
 const CANVA_CLIENT_SECRET = (process.env["CANVA_CLIENT_SECRET"] || "").trim();
@@ -11,8 +13,125 @@ const CANVA_SCOPES =
 
 const OAUTH_COOKIE_PREFIX = "canva_oauth_";
 const OAUTH_STATE_MAX_AGE = 15 * 60;
-let savedCanvaTokens: { accessToken: string; refreshToken?: string; expiresAt: number } | null =
-  null;
+const TOKENS_KEY = "canva:tokens";
+const REFRESH_LOCK_KEY = "canva:refresh-lock";
+const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+const VERIFY_CACHE_KEY = "canva:verified";
+const VERIFY_CACHE_MS = 10 * 60 * 1000;
+
+type CanvaTokens = { accessToken: string; refreshToken?: string; expiresAt: number };
+
+function parseTokenResponse(tokenData: unknown, previousRefresh?: string): CanvaTokens {
+  if (
+    !tokenData ||
+    typeof tokenData !== "object" ||
+    !("access_token" in tokenData) ||
+    typeof tokenData.access_token !== "string" ||
+    !tokenData.access_token
+  ) {
+    throw new Error("Canva returned an invalid token response");
+  }
+  const expiresIn =
+    "expires_in" in tokenData &&
+    typeof tokenData.expires_in === "number" &&
+    Number.isFinite(tokenData.expires_in) &&
+    tokenData.expires_in > 0
+      ? tokenData.expires_in
+      : 14400;
+  const refreshToken =
+    "refresh_token" in tokenData && typeof tokenData.refresh_token === "string"
+      ? tokenData.refresh_token
+      : previousRefresh;
+  return {
+    accessToken: tokenData.access_token,
+    ...(refreshToken ? { refreshToken } : {}),
+    expiresAt: Date.now() + expiresIn * 1000,
+  };
+}
+
+function basicAuthHeader() {
+  return `Basic ${Buffer.from(`${CANVA_CLIENT_ID}:${CANVA_CLIENT_SECRET}`).toString("base64")}`;
+}
+
+/**
+ * Returns a usable access token, refreshing it first when it is close to expiry.
+ * Canva refresh tokens are single-use, so refresh runs under a short store lock
+ * and the rotated refresh token is persisted immediately.
+ */
+async function getValidCanvaToken(): Promise<string | null> {
+  const store = getStore();
+  const tokens = await store.get<CanvaTokens>(TOKENS_KEY);
+  if (!tokens) return null;
+  if (tokens.expiresAt - Date.now() > REFRESH_MARGIN_MS) return tokens.accessToken;
+  if (!tokens.refreshToken || !CANVA_CLIENT_ID || !CANVA_CLIENT_SECRET) {
+    return tokens.expiresAt > Date.now() ? tokens.accessToken : null;
+  }
+  if (!(await store.claim(REFRESH_LOCK_KEY, 1, 30_000))) {
+    await new Promise((r) => setTimeout(r, 1500));
+    const latest = await store.get<CanvaTokens>(TOKENS_KEY);
+    return latest && latest.expiresAt > Date.now() ? latest.accessToken : null;
+  }
+  try {
+    const res = await fetch(CANVA_TOKEN_URL, {
+      method: "POST",
+      headers: {
+        Authorization: basicAuthHeader(),
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: tokens.refreshToken,
+      }).toString(),
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      await res.body?.cancel().catch(() => {});
+      console.error(`[canva] token refresh failed status=${res.status}`);
+      if (res.status === 400 || res.status === 401) await store.delete(TOKENS_KEY);
+      return null;
+    }
+    const next = parseTokenResponse(await res.json(), tokens.refreshToken);
+    await store.set(TOKENS_KEY, next);
+    return next.accessToken;
+  } finally {
+    await store.delete(REFRESH_LOCK_KEY).catch(() => {});
+  }
+}
+
+/** Confirms the token works against the Canva API (cached briefly). */
+async function verifyCanvaConnection(): Promise<{ connected: boolean; verified: boolean }> {
+  const store = getStore();
+  const token = await getValidCanvaToken();
+  if (!token) return { connected: false, verified: false };
+  if (await store.get<boolean>(VERIFY_CACHE_KEY)) return { connected: true, verified: true };
+  const res = await fetch("https://api.canva.com/rest/v1/users/me", {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(8_000),
+  }).catch(() => null);
+  await res?.body?.cancel().catch(() => {});
+  const verified = Boolean(res?.ok);
+  if (verified) await store.set(VERIFY_CACHE_KEY, true, VERIFY_CACHE_MS);
+  return { connected: true, verified };
+}
+
+async function statusResponse() {
+  const store = getStore();
+  const configured = Boolean(CANVA_CLIENT_ID && CANVA_CLIENT_SECRET);
+  const conn = configured
+    ? await verifyCanvaConnection().catch(() => ({ connected: false, verified: false }))
+    : { connected: false, verified: false };
+  return Response.json(
+    {
+      configured,
+      brandTemplateConfigured: Boolean(CANVA_BRAND_TEMPLATE_ID),
+      brandTemplateId: CANVA_BRAND_TEMPLATE_ID, // non-secret design template ID
+      connected: conn.connected,
+      verified: conn.verified,
+      durable: store.durable,
+    },
+    { headers: { "Cache-Control": "no-store" } },
+  );
+}
 
 function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -73,6 +192,9 @@ export const Route = createFileRoute("/api/canva")({
 
         // 1. Authorize: Redirect user to Canva OAuth consent screen
         if (action === "auth") {
+          if (!isOwner(request)) {
+            return Response.redirect(`${url.origin}/?canva_status=owner_session_required`, 302);
+          }
           if (!CANVA_CLIENT_ID || !CANVA_CLIENT_SECRET) {
             return Response.redirect(`${url.origin}/?canva_status=not_configured`, 302);
           }
@@ -128,9 +250,6 @@ export const Route = createFileRoute("/api/canva")({
           const redirectUri = getRedirectUri(request);
 
           try {
-            const basicAuth = Buffer.from(`${CANVA_CLIENT_ID}:${CANVA_CLIENT_SECRET}`).toString(
-              "base64",
-            );
             const tokenParams = new URLSearchParams({
               grant_type: "authorization_code",
               code,
@@ -141,7 +260,7 @@ export const Route = createFileRoute("/api/canva")({
             const tokenRes = await fetch(CANVA_TOKEN_URL, {
               method: "POST",
               headers: {
-                Authorization: `Basic ${basicAuth}`,
+                Authorization: basicAuthHeader(),
                 "Content-Type": "application/x-www-form-urlencoded",
               },
               body: tokenParams.toString(),
@@ -159,30 +278,9 @@ export const Route = createFileRoute("/api/canva")({
               return response;
             }
 
-            const tokenData: unknown = await tokenRes.json();
-            if (
-              !tokenData ||
-              typeof tokenData !== "object" ||
-              !("access_token" in tokenData) ||
-              typeof tokenData.access_token !== "string" ||
-              !tokenData.access_token
-            ) {
-              throw new Error("Canva returned an invalid token response");
-            }
-            const expiresIn =
-              "expires_in" in tokenData &&
-              typeof tokenData.expires_in === "number" &&
-              Number.isFinite(tokenData.expires_in) &&
-              tokenData.expires_in > 0
-                ? tokenData.expires_in
-                : 14400;
-            savedCanvaTokens = {
-              accessToken: tokenData.access_token,
-              ...("refresh_token" in tokenData && typeof tokenData.refresh_token === "string"
-                ? { refreshToken: tokenData.refresh_token }
-                : {}),
-              expiresAt: Date.now() + expiresIn * 1000,
-            };
+            const store = getStore();
+            await store.set(TOKENS_KEY, parseTokenResponse(await tokenRes.json()));
+            await store.delete(VERIFY_CACHE_KEY);
 
             const response = Response.redirect(`${clientOrigin}/?canva_status=connected`, 302);
             clearOauthCookie(response, request, state);
@@ -195,19 +293,8 @@ export const Route = createFileRoute("/api/canva")({
           }
         }
 
-        // Default GET: Return status JSON
-        return new Response(
-          JSON.stringify({
-            configured: Boolean(CANVA_CLIENT_ID && CANVA_CLIENT_SECRET),
-            brandTemplateConfigured: Boolean(CANVA_BRAND_TEMPLATE_ID),
-            brandTemplateId: CANVA_BRAND_TEMPLATE_ID, // non-secret design template ID
-            // in-memory only, resets on restart (durable token storage = next phase)
-            connectedThisInstance: Boolean(
-              savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now(),
-            ),
-          }),
-          { headers: { "Content-Type": "application/json" } },
-        );
+        // Default GET: status (connection is verified against the Canva API)
+        return statusResponse();
       },
 
       POST: async ({ request }) => {
@@ -215,6 +302,7 @@ export const Route = createFileRoute("/api/canva")({
         const redirectUri = getRedirectUri(request);
 
         if (body["action"] === "get_auth_url") {
+          if (!isOwner(request)) return unauthorized();
           if (!CANVA_CLIENT_ID || !CANVA_CLIENT_SECRET) {
             return Response.json({ error: "canva_not_configured" }, { status: 503 });
           }
@@ -242,18 +330,7 @@ export const Route = createFileRoute("/api/canva")({
           return response;
         }
 
-        return new Response(
-          JSON.stringify({
-            configured: Boolean(CANVA_CLIENT_ID && CANVA_CLIENT_SECRET),
-            brandTemplateConfigured: Boolean(CANVA_BRAND_TEMPLATE_ID),
-            brandTemplateId: CANVA_BRAND_TEMPLATE_ID, // non-secret design template ID
-            // in-memory only, resets on restart (durable token storage = next phase)
-            connectedThisInstance: Boolean(
-              savedCanvaTokens && savedCanvaTokens.expiresAt > Date.now(),
-            ),
-          }),
-          { headers: { "Content-Type": "application/json" } },
-        );
+        return statusResponse();
       },
     },
   },

@@ -20,15 +20,32 @@ describe("isSafeImageUrl", () => {
 
 describe("canvaStatus", () => {
   it("is needs_setup without client credentials", () => {
-    expect(canvaStatus({ configured: false, connectedThisInstance: false })).toBe("needs_setup");
+    expect(canvaStatus({ configured: false, connected: false })).toBe("needs_setup");
   });
   it("is configured_unverified before any OAuth", () => {
-    expect(canvaStatus({ configured: true, connectedThisInstance: false })).toBe(
+    expect(canvaStatus({ configured: true, connected: false, durable: true })).toBe(
       "configured_unverified",
     );
   });
-  it("is limited (never verified) with an in-memory token", () => {
-    expect(canvaStatus({ configured: true, connectedThisInstance: true })).toBe("limited");
+  it("is limited when the token is only in memory", () => {
+    expect(canvaStatus({ configured: true, connected: true, verified: true, durable: false })).toBe(
+      "limited",
+    );
+  });
+  it("is limited when the Canva API check failed", () => {
+    expect(canvaStatus({ configured: true, connected: true, verified: false, durable: true })).toBe(
+      "limited",
+    );
+  });
+  it("is verified only with a durable token and a successful API check", () => {
+    expect(canvaStatus({ configured: true, connected: true, verified: true, durable: true })).toBe(
+      "verified",
+    );
+  });
+  it("ignores the legacy connectedThisInstance flag", () => {
+    expect(canvaStatus({ configured: true, connectedThisInstance: true })).toBe(
+      "configured_unverified",
+    );
   });
   it("is blocked when the status response is unusable", () => {
     expect(canvaStatus(null)).toBe("blocked");

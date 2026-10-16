@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { unlockOwnerSession } from "@/lib/posts";
 import {
   Check,
   Copy,
@@ -8,7 +10,6 @@ import {
   Send,
   Sparkles,
   ShieldCheck,
-  CheckCircle2,
 } from "lucide-react";
 
 type Lang = "ar" | "en";
@@ -18,15 +19,54 @@ interface WhatsAppHubProps {
   log: (s: string, tone?: "info" | "ok" | "err") => void;
 }
 
+interface WaMessage {
+  id: string;
+  direction: "in" | "out";
+  contact: string;
+  name?: string;
+  type: string;
+  text: string;
+  timestamp: string;
+}
+
 interface LiveConversation {
   id: string;
   clientName: string;
   clientHandle: string;
-  channel: "whatsapp" | "messenger" | "instagram";
-  incomingText: string;
-  aiAutoReply: string;
-  timestamp: string;
-  branch?: string;
+  messages: WaMessage[];
+  lastAt: string;
+}
+
+type InboxResult =
+  | { state: "ok"; messages: WaMessage[]; durable: boolean }
+  | { state: "locked" }
+  | { state: "error" };
+
+async function fetchInbox(): Promise<InboxResult> {
+  const res = await fetch("/api/whatsapp/messages").catch(() => null);
+  if (!res) return { state: "error" };
+  if (res.status === 401) return { state: "locked" };
+  if (!res.ok) return { state: "error" };
+  const data = (await res.json()) as { messages: WaMessage[]; durable: boolean };
+  return { state: "ok", messages: data.messages ?? [], durable: !!data.durable };
+}
+
+function groupConversations(messages: WaMessage[]): LiveConversation[] {
+  const by = new Map<string, LiveConversation>();
+  for (const m of [...messages].sort((a, b) => a.timestamp.localeCompare(b.timestamp))) {
+    const c = by.get(m.contact) ?? {
+      id: m.contact,
+      clientName: m.name || `+${m.contact}`,
+      clientHandle: `+${m.contact}`,
+      messages: [],
+      lastAt: m.timestamp,
+    };
+    if (m.direction === "in" && m.name) c.clientName = m.name;
+    c.messages.push(m);
+    c.lastAt = m.timestamp;
+    by.set(m.contact, c);
+  }
+  return [...by.values()].sort((a, b) => b.lastAt.localeCompare(a.lastAt));
 }
 
 const TEMPLATES = [
@@ -67,7 +107,78 @@ const TEMPLATES = [
 
 export function WhatsAppHub({ lang, log }: WhatsAppHubProps) {
   const isAr = lang === "ar";
-  const conversations: LiveConversation[] = [];
+  const queryClient = useQueryClient();
+  const inbox = useQuery({
+    queryKey: ["whatsapp-inbox"],
+    queryFn: fetchInbox,
+    refetchInterval: (q) => (q.state.data?.state === "ok" ? 15_000 : false),
+    refetchOnWindowFocus: true,
+  });
+  const conversations = useMemo(
+    () => (inbox.data?.state === "ok" ? groupConversations(inbox.data.messages) : []),
+    [inbox.data],
+  );
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const send = useMutation({
+    mutationFn: async ({ to, text }: { to: string; text: string }) => {
+      const res = await fetch("/api/whatsapp/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, text }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error || "whatsapp_send_failed");
+    },
+    onSuccess: (_d, v) => {
+      setDrafts((d) => ({ ...d, [v.to]: "" }));
+      log(isAr ? "تم إرسال الرد عبر واتساب" : "Reply sent via WhatsApp", "ok");
+      void queryClient.invalidateQueries({ queryKey: ["whatsapp-inbox"] });
+    },
+    onError: (e: Error) => {
+      const msg: Record<string, string> = {
+        outside_24h_window: isAr
+          ? "مرّت أكثر من 24 ساعة على آخر رسالة من العميل — يلزم قالب معتمد"
+          : "Outside the 24h window — an approved template is required",
+        whatsapp_not_configured: isAr
+          ? "إرسال واتساب غير مُهيأ"
+          : "WhatsApp sending is not configured",
+        whatsapp_auth_failed: isAr ? "توكن واتساب غير صالح" : "WhatsApp token rejected",
+        owner_session_required: isAr ? "يلزم فتح جلسة المالك" : "Owner session required",
+      };
+      log(msg[e.message] || (isAr ? "فشل الإرسال" : "Send failed"), "err");
+    },
+  });
+  const unlock = async () => {
+    const pin = window.prompt(isAr ? "أدخل رمز المالك" : "Enter owner PIN") || "";
+    if (!pin) return;
+    const r = await unlockOwnerSession(pin);
+    if (!r.ok) {
+      log(isAr ? "تعذّر فتح جلسة المالك" : `Owner unlock failed (${r.error})`, "err");
+      return;
+    }
+    log(isAr ? "تم فتح جلسة المالك" : "Owner session unlocked", "ok");
+    void queryClient.invalidateQueries({ queryKey: ["whatsapp-inbox"] });
+  };
+  const inboxLabel =
+    inbox.data?.state === "ok"
+      ? inbox.data.durable
+        ? isAr
+          ? "متصل — يتم التحديث كل 15 ثانية"
+          : "Live — refreshes every 15s"
+        : isAr
+          ? "محدود — التخزين غير دائم"
+          : "Limited — storage is not durable"
+      : inbox.data?.state === "locked"
+        ? isAr
+          ? "مقفل — يلزم رمز المالك"
+          : "Locked — owner PIN required"
+        : inbox.isLoading
+          ? isAr
+            ? "جارٍ التحقق…"
+            : "Checking…"
+          : isAr
+            ? "تعذّر الوصول إلى صندوق الوارد"
+            : "Inbox unavailable";
 
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]!.id);
   const [customText, setCustomText] = useState(isAr ? TEMPLATES[0]!.textAr : TEMPLATES[0]!.textEn);
@@ -274,11 +385,18 @@ ${channelContext}
               {isAr ? "صندوق الرسائل الواردة" : "Incoming message inbox"}
             </h3>
           </div>
-          <span className="text-xs text-muted-foreground">
-            {isAr
-              ? "غير متصل — لا توجد بيانات رسائل فعلية"
-              : "Not connected — no live message data"}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">{inboxLabel}</span>
+            {inbox.data?.state === "locked" && (
+              <button
+                type="button"
+                onClick={unlock}
+                className="rounded border border-primary/40 px-2 py-0.5 text-[11px] text-primary hover:bg-primary/10"
+              >
+                {isAr ? "فتح" : "Unlock"}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -287,114 +405,89 @@ ${channelContext}
               key={conv.id}
               className="rounded-lg border border-border bg-background/40 p-3.5 space-y-2.5 hover:border-primary/50 transition"
             >
-              {/* Header */}
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`rounded-full px-2 py-0.5 font-semibold text-[11px] ${
-                      conv.channel === "whatsapp"
-                        ? "bg-emerald-500/20 text-emerald-400"
-                        : conv.channel === "messenger"
-                          ? "bg-blue-500/20 text-blue-400"
-                          : "bg-pink-500/20 text-pink-400"
-                    }`}
-                  >
-                    {conv.channel === "whatsapp"
-                      ? "WhatsApp"
-                      : conv.channel === "messenger"
-                        ? "Messenger"
-                        : "Instagram"}
+                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[11px] font-semibold text-emerald-400">
+                    WhatsApp
                   </span>
                   <span className="font-bold text-foreground">{conv.clientName}</span>
-                  <span dir="ltr" className="font-mono text-muted-foreground text-[11px]">
+                  <span dir="ltr" className="font-mono text-[11px] text-muted-foreground">
                     {conv.clientHandle}
                   </span>
-                  {conv.branch && (
-                    <span className="rounded bg-secondary px-1.5 py-0.2 text-[10px] text-muted-foreground">
-                      📍 {conv.branch}
+                </div>
+                <span className="text-[11px] text-muted-foreground">
+                  {new Date(conv.lastAt).toLocaleString()}
+                </span>
+              </div>
+
+              <div className="max-h-56 space-y-1.5 overflow-y-auto text-xs">
+                {conv.messages.slice(-10).map((m) => (
+                  <div
+                    key={m.id}
+                    className={
+                      m.direction === "in"
+                        ? "rounded bg-secondary/50 p-2 text-foreground/90"
+                        : "rounded border border-primary/20 bg-primary/5 p-2 text-foreground"
+                    }
+                  >
+                    <span
+                      className={`me-1 font-semibold ${m.direction === "in" ? "text-muted-foreground" : "text-primary"}`}
+                    >
+                      {m.direction === "in"
+                        ? isAr
+                          ? "العميل:"
+                          : "Client:"
+                        : isAr
+                          ? "ردك:"
+                          : "You:"}
                     </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
-                    <CheckCircle2 className="size-3.5" />
-                    {isAr ? "تم الرد تلقائياً بالذكاء الاصطناعي" : "AI Auto-Replied"}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">{conv.timestamp}</span>
-                </div>
+                    {m.text}
+                  </div>
+                ))}
               </div>
 
-              {/* Message Exchange */}
-              <div className="space-y-1.5 text-xs">
-                <div className="rounded bg-secondary/50 p-2 text-foreground/90">
-                  <span className="font-semibold text-muted-foreground me-1">
-                    {isAr ? "العميل:" : "Client:"}
-                  </span>
-                  {conv.incomingText}
-                </div>
-                <div className="rounded border border-primary/20 bg-primary/5 p-2 text-foreground">
-                  <span className="font-semibold text-primary me-1">
-                    {isAr ? "رد كوتش براين التلقائي:" : "AI Reply:"}
-                  </span>
-                  {conv.aiAutoReply}
-                </div>
-              </div>
-
-              {/* Quick Action */}
-              <div className="flex items-center justify-end gap-2 text-xs pt-1">
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                <input
+                  value={drafts[conv.id] ?? ""}
+                  onChange={(e) => setDrafts((d) => ({ ...d, [conv.id]: e.target.value }))}
+                  placeholder={isAr ? "اكتب الرد وراجعه قبل الإرسال" : "Type and review your reply"}
+                  className="min-w-0 flex-1 rounded border border-input bg-background/50 px-2 py-1 text-xs outline-none focus:border-primary"
+                />
                 <button
                   type="button"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(conv.aiAutoReply);
-                    log(isAr ? "تم نسخ نص الرد" : "Reply copied", "ok");
+                  onClick={() => {
+                    const last = [...conv.messages].reverse().find((m) => m.direction === "in");
+                    if (last) {
+                      setClientQuery(last.text);
+                      setReplyChannel("whatsapp");
+                    }
                   }}
                   className="flex items-center gap-1 rounded border border-border px-2 py-1 text-[11px] hover:bg-secondary"
                 >
-                  <Copy className="size-3" />
-                  {isAr ? "نسخ الرد" : "Copy"}
+                  <Sparkles className="size-3" />
+                  {isAr ? "صياغة بكوتش براين" : "Draft with Brain"}
                 </button>
-                {conv.channel === "whatsapp" && (
-                  <a
-                    href={`https://wa.me/${phoneE164}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 rounded bg-emerald-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-emerald-500"
-                  >
-                    <ExternalLink className="size-3" />
-                    {isAr ? "فتح المحادثة" : "Open Chat"}
-                  </a>
-                )}
-                {conv.channel === "messenger" && (
-                  <a
-                    href={messengerUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 rounded bg-blue-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-blue-500"
-                  >
-                    <ExternalLink className="size-3" />
-                    {isAr ? "فتح ماسنجر" : "Open Messenger"}
-                  </a>
-                )}
-                {conv.channel === "instagram" && (
-                  <a
-                    href={instagramUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 rounded bg-pink-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-pink-500"
-                  >
-                    <ExternalLink className="size-3" />
-                    {isAr ? "فتح إنستغرام" : "Open Instagram"}
-                  </a>
-                )}
+                <button
+                  type="button"
+                  disabled={!(drafts[conv.id] ?? "").trim() || send.isPending}
+                  onClick={() => send.mutate({ to: conv.id, text: (drafts[conv.id] ?? "").trim() })}
+                  className="flex items-center gap-1 rounded bg-emerald-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                >
+                  <Send className="size-3" />
+                  {isAr ? "إرسال" : "Send"}
+                </button>
               </div>
             </div>
           ))}
           {conversations.length === 0 && (
             <p className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
-              {isAr
-                ? "لن تظهر هنا رسائل إلا بعد ربط WhatsApp Business API أو مصدر رسائل فعلي."
-                : "Messages will appear here only after connecting WhatsApp Business API or another live inbox."}
+              {inbox.data?.state === "ok"
+                ? isAr
+                  ? "لا توجد رسائل واردة بعد."
+                  : "No inbound messages yet."
+                : isAr
+                  ? "لن تظهر هنا رسائل إلا بعد ربط WhatsApp Cloud API وفتح جلسة المالك."
+                  : "Messages appear here once WhatsApp Cloud API is connected and the owner session is unlocked."}
             </p>
           )}
         </div>

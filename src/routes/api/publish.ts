@@ -1,27 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { isSafeImageUrl, withTimeout } from "@/lib/integration-guards";
+import { checkPin, json, pinConfigState } from "@/lib/owner-auth";
+import { getStore } from "@/lib/store";
 
 /**
  * Owner-approved publishing to Meta (Facebook Page / Instagram Business).
  *
- * Known limits (no durable store in this project yet):
- * - Duplicate protection is best-effort: an in-memory key set per worker
- *   instance plus the client marking the post Published. It is NOT a
- *   guaranteed idempotency mechanism across instances/restarts.
- * - PIN guessing protection: enforced minimum PIN length, a fixed delay on
- *   every failed attempt, and a best-effort per-client in-memory limiter.
- *   A durable rate limiter needs persistent storage (next phase).
+ * - PIN attempts are limited by an atomic counter in the shared store
+ *   (durable when Supabase is configured; per-instance memory otherwise).
+ * - Duplicate protection: `platform:idempotencyKey` is claimed atomically in
+ *   the store for 24h before calling Meta.
  */
 
-const MIN_PIN_LENGTH = 8;
-const FAIL_DELAY_MS = 1200;
-const MAX_FAILS = 5;
-const FAIL_WINDOW_MS = 15 * 60 * 1000;
 const DEDUPE_TTL_MS = 24 * 60 * 60 * 1000;
-
-const failures = new Map<string, { count: number; first: number }>();
-const recentPublishes = new Map<string, number>();
 
 const META_TIMEOUT_MS = 20_000;
 
@@ -42,39 +34,16 @@ const Body = z.object({
     .optional(),
 });
 
-function safeEqual(a: string, b: string) {
-  const x = new TextEncoder().encode(a);
-  const y = new TextEncoder().encode(b);
-  let d = x.length ^ y.length;
-  for (let i = 0; i < Math.max(x.length, y.length); i++) d |= (x[i] ?? 0) ^ (y[i] ?? 0);
-  return d === 0;
-}
-
-const json = (body: unknown, status = 200) =>
-  Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-function clientKey(request: Request) {
-  return (
-    request.headers.get("cf-connecting-ip") ||
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "unknown"
-  );
-}
-
 function readConfig() {
   const env = (k: string) => (process.env[k] || "").trim();
   const fbToken = env("FACEBOOK_PAGE_ACCESS_TOKEN");
   const fbPage = env("FACEBOOK_PAGE_ID");
   const igToken = env("INSTAGRAM_ACCESS_TOKEN");
   const igAccount = env("INSTAGRAM_ACCOUNT_ID");
-  const pin = env("OWNER_PUBLISH_PIN");
   const version = /^v\d+\.\d+$/.test(env("META_GRAPH_VERSION"))
     ? env("META_GRAPH_VERSION")
     : "v21.0";
   return {
-    pin,
-    pinValid: pin.length >= MIN_PIN_LENGTH,
     version,
     facebook: fbToken && fbPage ? { token: fbToken, id: fbPage } : null,
     instagram: igToken && igAccount ? { token: igToken, id: igAccount } : null,
@@ -106,7 +75,8 @@ export const Route = createFileRoute("/api/publish")({
         const c = readConfig();
         const st = (ok: boolean) => (ok ? "configured_unverified" : "not_configured");
         return json({
-          ownerPin: c.pin ? (c.pinValid ? "configured" : "too_short") : "not_configured",
+          ownerPin: pinConfigState(),
+          durableStore: getStore().durable,
           facebook: st(!!c.facebook),
           instagram: st(!!c.instagram),
         });
@@ -121,40 +91,35 @@ export const Route = createFileRoute("/api/publish")({
         const { pin, platform, caption, imageUrl, idempotencyKey } = parsed.data;
         const c = readConfig();
 
-        if (!c.pin) return json({ error: "publish_pin_not_configured" }, 503);
-        if (!c.pinValid) return json({ error: "publish_pin_too_weak" }, 503);
-
-        // Best-effort lockout (per worker instance) + fixed delay on failure.
-        const who = clientKey(request);
-        const now = Date.now();
-        const f = failures.get(who);
-        if (f && now - f.first < FAIL_WINDOW_MS && f.count >= MAX_FAILS) {
-          await sleep(FAIL_DELAY_MS);
-          return json({ error: "too_many_attempts" }, 429);
+        const store = getStore();
+        let pinResult;
+        try {
+          pinResult = await checkPin(request, pin, { store });
+        } catch {
+          return json({ error: "store_unavailable" }, 503);
         }
-        if (!safeEqual(pin, c.pin)) {
-          const next =
-            f && now - f.first < FAIL_WINDOW_MS
-              ? { count: f.count + 1, first: f.first }
-              : { count: 1, first: now };
-          failures.set(who, next);
-          await sleep(FAIL_DELAY_MS);
-          return json({ error: "wrong_pin" }, 401);
+        if (pinResult !== "ok") {
+          const status =
+            pinResult === "wrong_pin" ? 401 : pinResult === "too_many_attempts" ? 429 : 503;
+          return json({ error: pinResult }, status);
         }
-        failures.delete(who);
 
         const target = platform === "facebook" ? c.facebook : c.instagram;
         if (!target) return json({ error: `${platform}_not_configured` }, 503);
         if (platform === "instagram" && !imageUrl)
           return json({ error: "instagram_needs_image" }, 400);
 
-        // Best-effort duplicate guard (not durable).
-        for (const [k, t] of recentPublishes)
-          if (now - t > DEDUPE_TTL_MS) recentPublishes.delete(k);
-        const dedupeKey = idempotencyKey ? `${platform}:${idempotencyKey}` : null;
-        if (dedupeKey && recentPublishes.has(dedupeKey))
-          return json({ error: "duplicate_request" }, 409);
-        if (dedupeKey) recentPublishes.set(dedupeKey, now);
+        const dedupeKey = idempotencyKey ? `publish:${platform}:${idempotencyKey}` : null;
+        if (dedupeKey) {
+          let claimed: boolean;
+          try {
+            claimed = await store.claim(dedupeKey, { state: "pending" }, DEDUPE_TTL_MS);
+          } catch {
+            return json({ error: "store_unavailable" }, 503);
+          }
+          if (!claimed) return json({ error: "duplicate_request" }, 409);
+        }
+        const releaseKey = () => (dedupeKey ? store.delete(dedupeKey).catch(() => {}) : undefined);
 
         const G = `https://graph.facebook.com/${c.version}`;
         const call = async (path: string, params: Record<string, string>) => {
@@ -182,18 +147,23 @@ export const Route = createFileRoute("/api/publish")({
               ? await call(`${target.id}/photos`, { url: imageUrl, caption })
               : await call(`${target.id}/feed`, { message: caption });
             const id = String(r["post_id"] || r["id"] || "");
+            if (dedupeKey)
+              await store.set(dedupeKey, { state: "done", id }, DEDUPE_TTL_MS).catch(() => {});
             return json({ ok: true, id, url: id ? `https://www.facebook.com/${id}` : null });
           }
           const container = await call(`${target.id}/media`, { image_url: imageUrl, caption });
           const pub = await call(`${target.id}/media_publish`, {
             creation_id: String(container["id"]),
           });
-          return json({ ok: true, id: String(pub["id"] || ""), url: null });
+          const igId = String(pub["id"] || "");
+          if (dedupeKey)
+            await store.set(dedupeKey, { state: "done", id: igId }, DEDUPE_TTL_MS).catch(() => {});
+          return json({ ok: true, id: igId, url: null });
         } catch (e) {
           // On timeout Meta may still have published: keep the dedupe key so an
           // immediate retry cannot double-post. Other failures allow a deliberate retry.
           const timedOut = (e as Error)?.name === "TimeoutError";
-          if (dedupeKey && !timedOut) recentPublishes.delete(dedupeKey);
+          if (!timedOut) await releaseKey();
           if (e instanceof MetaError) {
             const authProblem =
               e.status === 401 || e.metaCode === 190 || e.metaCode === 10 || e.metaCode === 200;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { canvaStatus } from "@/lib/integration-guards";
+import { canvaStatus, type IntegrationStatus } from "@/lib/integration-guards";
 import {
   ExternalLink,
   FolderOpen,
@@ -68,11 +68,11 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
   const [canvaConfig, setCanvaConfig] = useState<{
     configured: boolean;
     brandTemplateId: string;
-    connected: boolean;
+    status: IntegrationStatus;
   }>({
     configured: false,
     brandTemplateId: "",
-    connected: false,
+    status: "needs_setup",
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef<string[]>([]);
@@ -92,8 +92,7 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
             setCanvaConfig({
               configured: data.configured,
               brandTemplateId: typeof data.brandTemplateId === "string" ? data.brandTemplateId : "",
-              // Token lives only in one server instance's memory: limited, not verified.
-              connected: canvaStatus(data) === "limited",
+              status: canvaStatus(data),
             });
         } else if (active) {
           setCanvaStatusError(true);
@@ -230,13 +229,17 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
               <span className="flex items-center gap-1 rounded bg-[#7D2AE8]/20 px-2 py-0.5 font-mono text-[11px] text-[#A855F7]">
                 <ShieldCheck className="size-3" />
                 {canvaConfig.configured
-                  ? canvaConfig.connected
+                  ? canvaConfig.status === "verified"
                     ? isAr
-                      ? "محدود (هذه الجلسة فقط)"
-                      : "Limited (this session only)"
-                    : isAr
-                      ? "مُهيأ/لم يُتحقق"
-                      : "Configured, not verified"
+                      ? "متصل ومُتحقق منه"
+                      : "Connected, verified"
+                    : canvaConfig.status === "limited"
+                      ? isAr
+                        ? "محدود (غير محفوظ دائماً أو فشل التحقق)"
+                        : "Limited (not durable or check failed)"
+                      : isAr
+                        ? "مُهيأ/لم يُتحقق"
+                        : "Configured, not verified"
                   : isAr
                     ? "غير مُهيأ"
                     : "Not configured"}

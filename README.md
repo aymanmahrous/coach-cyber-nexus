@@ -68,14 +68,18 @@ npm run deploy
 
 Configure only the integrations you intend to use as Cloudflare Worker secrets/variables before deploying:
 
-- `OWNER_PUBLISH_PIN`
+- `OWNER_PUBLISH_PIN` (min 8 chars; also unlocks the owner session)
+- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (durable storage — apply `supabase/migrations/*.sql` in the Supabase SQL editor first)
+- `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_APP_SECRET`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` (webhook URL: `https://<domain>/api/whatsapp`)
 - `FACEBOOK_PAGE_ACCESS_TOKEN`
 - `INSTAGRAM_ACCESS_TOKEN`
 - `OPENAI_API_KEY` or `GEMINI_API_KEY` / `GOOGLE_API_KEY`
 - `CANVA_CLIENT_ID` and `CANVA_CLIENT_SECRET`
 - `CANVA_REDIRECT_URI` (set to the deployed domain and registered in the Canva developer console)
 
-Publishing and AI integrations stay unavailable until their respective secrets are configured. Canva OAuth currently keeps the exchanged token in worker memory only; it is not durable across worker restarts or isolates.
+Publishing and AI integrations stay unavailable until their respective secrets are configured. Durable state (PIN attempt limiter, publish idempotency keys, Canva tokens, posts, WhatsApp inbox) lives in Supabase when `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` are set. Tables have RLS enabled with no policies, so only the server (service role) can access them. Without Supabase the app falls back to per-instance memory and reports those integrations as "limited", never "verified".
+
+Owner-only endpoints (`/api/posts`, `/api/whatsapp/messages`, Canva connect) require an owner session: unlock it once with the owner PIN in the UI (HttpOnly cookie, 7 days).
 
 To deploy an already-built `.output` directory:
 
