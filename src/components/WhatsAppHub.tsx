@@ -384,8 +384,8 @@ ${channelContext}
               </div>
               <p className="text-xs text-muted-foreground">
                 {isAr
-                  ? "لا يوجد صندوق وارد حي أو رد آلي متصل حالياً. يمكنك صياغة رد بمساعدة كوتش براين ثم مراجعته وفتحه يدوياً في التطبيق."
-                  : "No live inbox or automatic replies are connected. Draft a reply with Coach Brain, review it, then open the messaging app manually."}
+                  ? "الرد الآلي غير مفعّل. الرسائل الواردة تظهر في صندوق الوارد أدناه بعد ربط WhatsApp Cloud API؛ صِغ الرد بمساعدة كوتش براين وراجعه قبل إرساله يدوياً."
+                  : "Automatic replies are off. Inbound messages appear in the inbox below once WhatsApp Cloud API is connected; draft with Coach Brain and review before sending manually."}
               </p>
             </div>
           </div>
