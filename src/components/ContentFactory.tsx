@@ -100,7 +100,7 @@ const L = {
     },
     platforms: "المنصات المستهدفة",
     topic: "فكرة أو موضوع مخصص (اختياري)",
-    topicPh: "مثال: تصحيح النفس في السباحة الحرة، أو عروض فرع مدينة خليفة والمشرف",
+    topicPh: "مثال: تدريب التنفس أو موضوع فرع موثق في معرفة الأكاديمية",
     generate: "توليد محتوى متنوع بكوتش براين",
     generating: "كوتش براين يصيغ المحتوى…",
     manual: "إضافة منشور يدوي",
@@ -131,8 +131,6 @@ const L = {
       "حماية الأكاديمية: لا يتم النشر أو سحب رصيد تلقائياً. الخطط والمنشورات تُحفظ على هذا الجهاز فقط؛ لا تُجدول أو تُنشر على المنصات إلا بعد ربط الحسابات وموافقتك اليدوية.",
     err: "تعذر التوليد",
     needWhen: "حدد موعد وتاريخ النشر أولاً",
-    fbPage: "صفحة فيسبوك: 1164107840123575",
-    igAccount: "إنستغرام: 17841439747493221",
   },
   en: {
     title: "Smart Content Factory",
@@ -145,7 +143,7 @@ const L = {
     },
     platforms: "Platforms",
     topic: "Custom Topic / Focus (optional)",
-    topicPh: "e.g. Freestyle breathing drill or Khalifa City branch special",
+    topicPh: "e.g. a breathing drill or a branch topic verified in Academy Knowledge",
     generate: "Generate Varied Content with AI",
     generating: "Coach Brain is crafting content…",
     manual: "Add Manual Post",
@@ -176,8 +174,6 @@ const L = {
       "Academy Protection: No automatic publishing or ad spend. Plans and posts are saved on this device only; they are not scheduled on social platforms unless accounts are connected and you manually approve.",
     err: "Generation failed",
     needWhen: "Select publish time first",
-    fbPage: "Facebook Page: 1164107840123575",
-    igAccount: "Instagram: 17841439747493221",
   },
 };
 
@@ -219,9 +215,7 @@ Requested post count: ${n}
 Target Platforms: ${plats.map((p) => PLAT[p]).join(", ")}.
 Topic Focus: ${topic || "Mix of technique correction, fear of water progressive therapy, and Abu Dhabi pool branches"}.
 Language: ${lang === "ar" ? "Gulf-friendly professional Arabic" : "English"}.
-Official Booking WhatsApp: 058 821 9130.
-Pool branches: Al Mushrif, Al Falah, Khalifa City, Al Danah.
-STRICT MARKETING RULE: DO NOT put numerical prices (AED) in the public social post captions or visuals! Focus on technique, overcoming water fear, and invite people to inquire via WhatsApp: 058 821 9130. Prices are reserved for qualified leads in private chat. Never invent customer testimonials, results, schedules, limited availability, or facility/safety claims. If TikTok is selected, every TikTok post must use a vertical 9:16 drill or quiz format.
+Use only Academy-specific facts available in the protected Academy Knowledge context. If a contact, branch, offer, or service detail is not present there, omit it rather than guessing. NEVER include prices or numerical amounts in public social captions or visuals, even when present in Academy Knowledge. Never invent testimonials, results, schedules, availability, or facility/safety claims. If TikTok is selected, every TikTok post must use a vertical 9:16 drill or quiz format.
 
 CRITICAL INSTRUCTION: DO NOT use the same visual format or template for all posts! Vary the template style across:
 1) "drill" (9:16 vertical video reel with 3s hook)
@@ -297,9 +291,7 @@ Return ONLY valid JSON, no markdown fences, matching this structure:
     const prompt = `Create a full 7-day social media publishing schedule for Coach Ayman Swimming Academy in Abu Dhabi.
 Requested post count: 7
 Target Platforms: ${plats.map((p) => PLAT[p]).join(", ")}.
-Official Booking WhatsApp: 058 821 9130.
-Pool branches: Al Mushrif, Al Falah, Khalifa City, Al Danah.
-STRICT MARKETING RULE: DO NOT include numerical prices (AED) in the public captions or visuals! Invite people to inquire via WhatsApp 058 821 9130. Never invent customer testimonials, results, schedules, limited availability, or facility/safety claims. If TikTok is selected, every TikTok post must use a vertical 9:16 drill or quiz format.
+Use only Academy-specific facts available in the protected Academy Knowledge context. If a contact, branch, offer, or service detail is not present there, omit it rather than guessing. NEVER include prices or numerical amounts in public captions or visuals, even when present in Academy Knowledge. Never invent testimonials, results, schedules, availability, or facility/safety claims. If TikTok is selected, every TikTok post must use a vertical 9:16 drill or quiz format.
 
 CRITICAL: Return exactly 7 varied posts across all 5 styles:
 1) drill (9:16 vertical video reel with 3s hook)
@@ -410,10 +402,6 @@ Return ONLY valid JSON matching this structure:
       <section className="glass space-y-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-display text-sm tracking-wider text-primary">{t.title}</h2>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="rounded bg-secondary px-2 py-0.5 font-mono">{t.fbPage}</span>
-            <span className="rounded bg-secondary px-2 py-0.5 font-mono">{t.igAccount}</span>
-          </div>
         </div>
 
         <div>
@@ -552,8 +540,6 @@ function EnhancedPostCard({
   const [when, setWhen] = useState(p.scheduledAt || "");
   const [copied, setCopied] = useState(false);
   const [showStudio, setShowStudio] = useState(true);
-  const [verifyingPublish, setVerifyingPublish] = useState(false);
-  const [customLiveUrl, setCustomLiveUrl] = useState(p.publishedExternalUrl || "");
 
   const templateMeta = TEMPLATE_INFO[templateType] || TEMPLATE_INFO.drill;
 
@@ -562,147 +548,6 @@ function EnhancedPostCard({
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
     log(isAr ? "تم نسخ نص المنشور والهاشتاجات!" : "Caption copied!", "ok");
-  };
-
-  const getPlatformDefaultUrl = (plat: Platform) => {
-    switch (plat) {
-      case "instagram":
-        return "https://www.instagram.com/RelaxFixUAE";
-      case "facebook":
-        return "https://www.facebook.com/1164107840123575";
-      case "tiktok":
-        return "https://www.tiktok.com/@RelaxFixUAE";
-    }
-  };
-
-  const handleLaunchPublishBridge = async () => {
-    // 1. Copy caption + hashtags
-    await navigator.clipboard.writeText(p.caption);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-
-    // 2. Open destination composer
-    let composerUrl = "";
-    if (p.platform === "instagram") {
-      composerUrl = "https://business.facebook.com/latest/composer?context=instagram";
-    } else if (p.platform === "facebook") {
-      composerUrl = "https://www.facebook.com/1164107840123575";
-    } else {
-      composerUrl = "https://www.tiktok.com/creator-center/upload";
-    }
-
-    window.open(composerUrl, "_blank", "noopener");
-    setVerifyingPublish(true);
-
-    log(
-      isAr
-        ? `📋 تم نسخ النص والهاشتاجات وجارٍ فتح صفحة ${PLAT[p.platform]} للنشر المباشر!`
-        : `Copied caption & opened ${PLAT[p.platform]} composer!`,
-      "info",
-    );
-  };
-
-  const [imageUrl, setImageUrl] = useState("");
-  const [metaBusy, setMetaBusy] = useState(false);
-  const handleMetaPublish = async () => {
-    if (p.platform === "tiktok") return;
-    if (p.platform === "instagram" && !imageUrl.trim())
-      return log(
-        isAr
-          ? "إنستغرام يحتاج رابط صورة عام (من كانفا أو درايف)"
-          : "Instagram needs a public image URL",
-        "err",
-      );
-    if (
-      !window.confirm(
-        isAr
-          ? `تأكيد النشر الفعلي الآن على ${PLAT[p.platform]}؟`
-          : `Publish to ${PLAT[p.platform]} now?`,
-      )
-    )
-      return;
-    let pin = sessionStorage.getItem("owner-pin") || "";
-    if (!pin) pin = window.prompt(isAr ? "أدخل رمز المالك للنشر" : "Enter owner publish PIN") || "";
-    if (!pin) return;
-    setMetaBusy(true);
-    try {
-      const res = await fetch("/api/publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pin,
-          platform: p.platform,
-          caption: p.caption,
-          imageUrl: imageUrl.trim(),
-          idempotencyKey: /^[A-Za-z0-9_-]{4,64}$/.test(p.id) ? p.id : undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (data.error === "wrong_pin") sessionStorage.removeItem("owner-pin");
-        const msgs: Record<string, string> = {
-          wrong_pin: isAr ? "رمز المالك غير صحيح" : "Wrong PIN",
-          publish_pin_not_configured: isAr
-            ? "لم يتم ضبط رمز المالك بعد"
-            : "Owner PIN not set up yet",
-          facebook_not_configured: isAr ? "حساب فيسبوك غير مربوط بعد" : "Facebook not linked yet",
-          instagram_not_configured: isAr
-            ? "حساب إنستغرام غير مربوط بعد"
-            : "Instagram not linked yet",
-          instagram_needs_image: isAr ? "إنستغرام يحتاج رابط صورة" : "Instagram needs an image",
-          invalid_image_url: isAr
-            ? "رابط الصورة يجب أن يكون https عاماً وصالحاً"
-            : "Image URL must be a valid public https link",
-          publish_pin_too_weak: isAr
-            ? "رمز المالك المضبوط قصير جداً (8 أحرف على الأقل)"
-            : "Configured owner PIN is too short (min 8)",
-          too_many_attempts: isAr
-            ? "محاولات خاطئة كثيرة، حاول لاحقاً"
-            : "Too many attempts, try later",
-          duplicate_request: isAr
-            ? "تم إرسال هذا المنشور للنشر بالفعل"
-            : "This post was already sent for publishing",
-          meta_auth_failed: isAr
-            ? "تعذر التحقق من صلاحية حساب Meta"
-            : "Meta account authorization failed",
-          meta_publish_failed: isAr
-            ? "تعذر النشر على Meta، لم يُنشر شيء"
-            : "Meta publish failed; nothing was posted",
-        };
-        throw new Error(msgs[data.error] || (isAr ? "خطأ غير معروف" : "Unknown error"));
-      }
-      sessionStorage.setItem("owner-pin", pin);
-      update(p.id, {
-        status: "Published",
-        publishedExternalId: data.id,
-        publishedExternalUrl: data.url || undefined,
-      } as Partial<Post>);
-      log(
-        isAr
-          ? `✅ تم النشر فعلياً على ${PLAT[p.platform]}`
-          : `Published live on ${PLAT[p.platform]}`,
-        "ok",
-      );
-    } catch (e) {
-      log(`${isAr ? "فشل النشر" : "Publish failed"}: ${(e as Error).message}`, "err");
-    } finally {
-      setMetaBusy(false);
-    }
-  };
-
-  const handleConfirmPublished = () => {
-    const finalUrl = customLiveUrl.trim() || getPlatformDefaultUrl(p.platform);
-    update(p.id, {
-      status: "Published",
-      publishedExternalUrl: finalUrl,
-    });
-    setVerifyingPublish(false);
-    log(
-      isAr
-        ? `✅ تم تأكيد اكتمال النشر على ${PLAT[p.platform]} بنجاح!`
-        : `Confirmed publication on ${PLAT[p.platform]}!`,
-      "ok",
-    );
   };
 
   return (
@@ -848,217 +693,15 @@ function EnhancedPostCard({
         </>
       )}
 
-      {/* Verification Box when publishing is initiated */}
-      {verifyingPublish && (
-        <div className="rounded-lg border border-accent/40 bg-accent/10 p-3 space-y-2 text-xs">
-          <div className="font-semibold text-accent flex items-center gap-1.5">
-            <span>🚀</span>
-            <span>
-              {isAr
-                ? `تم فتح ${PLAT[p.platform]} ونسخ المنشور. بعد لصق المنشور والضغط على نشر، أكد أدناه:`
-                : `${PLAT[p.platform]} composer opened with caption copied. Confirm below:`}
-            </span>
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[11px] text-muted-foreground">
-              {isAr ? "رابط المنشور المباشر (اختياري):" : "Direct live post URL (optional):"}
-            </label>
-            <input
-              type="url"
-              value={customLiveUrl}
-              onChange={(e) => setCustomLiveUrl(e.target.value)}
-              placeholder={
-                p.platform === "instagram"
-                  ? "https://www.instagram.com/p/..."
-                  : p.platform === "facebook"
-                    ? "https://www.facebook.com/..."
-                    : "https://www.tiktok.com/@..."
-              }
-              className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground"
-            />
-          </div>
-
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={handleConfirmPublished}
-              className="flex items-center gap-1 rounded-md bg-accent px-3 py-1.5 font-bold text-accent-foreground shadow"
-            >
-              <Check className="size-3.5" />
-              {isAr ? "تأكيد اكتمال النشر الفعلي" : "Confirm Published"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setVerifyingPublish(false)}
-              className="rounded-md border border-border px-2.5 py-1.5 text-muted-foreground hover:text-foreground"
-            >
-              {isAr ? "إلغاء" : "Cancel"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Bottom Scheduling & Publish Controls */}
+      {/* Write actions stay unavailable until the staff RPC contracts are wired. */}
       {!editing && (
-        <div className="mt-auto space-y-2 border-t border-border pt-3">
-          {p.status === "Needs Review" && (
-            <div className="space-y-1.5">
-              <label className="text-xs text-muted-foreground flex items-center gap-1">
-                <Calendar className="size-3" />
-                {t.when}
-              </label>
-              <input
-                type="datetime-local"
-                value={when}
-                onChange={(e) => setWhen(e.target.value)}
-                className="w-full rounded-md border border-input bg-background px-2.5 py-1.5 text-sm"
-              />
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center gap-2 text-sm pt-1">
-            {p.status === "Needs Review" && (
-              <>
-                <button
-                  onClick={() => {
-                    if (!when) return log(t.needWhen, "err");
-                    update(p.id, { status: "Scheduled", scheduledAt: when });
-                    log(`${t.approve}: ${PLAT[p.platform]} (${when})`, "ok");
-                  }}
-                  className="flex items-center gap-1 rounded-md bg-accent px-3 py-1.5 font-semibold text-accent-foreground shadow-sm"
-                >
-                  <Check className="size-4" />
-                  {t.approve}
-                </button>
-
-                <button
-                  onClick={handleLaunchPublishBridge}
-                  className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 font-semibold text-primary-foreground shadow-sm"
-                >
-                  <Send className="size-3.5" />
-                  {isAr
-                    ? `نشر يدوي (نسخ وفتح ${PLAT[p.platform]})`
-                    : `Manual post (copy & open ${PLAT[p.platform]})`}
-                </button>
-              </>
-            )}
-
-            {(p.status === "Scheduled" || p.status === "Claimed") && p.platform !== "tiktok" && (
-              <div className="w-full space-y-2 rounded-md border border-primary/30 p-2">
-                <input
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  dir="ltr"
-                  placeholder={
-                    isAr
-                      ? "رابط الصورة العام (مطلوب لإنستغرام)"
-                      : "Public image URL (required for Instagram)"
-                  }
-                  className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-                />
-                <button
-                  onClick={handleMetaPublish}
-                  disabled={metaBusy}
-                  className="flex w-full items-center justify-center gap-1 rounded-md bg-accent px-3 py-1.5 font-semibold text-accent-foreground disabled:opacity-50"
-                >
-                  <Zap className="size-3.5" />
-                  {metaBusy
-                    ? isAr
-                      ? "جارٍ النشر…"
-                      : "Publishing…"
-                    : isAr
-                      ? `نشر فعلي الآن على ${PLAT[p.platform]}`
-                      : `Publish live to ${PLAT[p.platform]}`}
-                </button>
-              </div>
-            )}
-            {(p.status === "Scheduled" || p.status === "Claimed") && (
-              <>
-                <button
-                  onClick={handleLaunchPublishBridge}
-                  className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 font-semibold text-primary-foreground"
-                >
-                  <Send className="size-3.5" />
-                  {isAr
-                    ? `نشر يدوي (نسخ وفتح ${PLAT[p.platform]})`
-                    : `Manual post (copy & open ${PLAT[p.platform]})`}
-                </button>
-
-                <button
-                  onClick={() => setVerifyingPublish(true)}
-                  className="rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-secondary"
-                >
-                  {t.markPub}
-                </button>
-
-                <button
-                  onClick={() => update(p.id, { status: "Needs Review" })}
-                  className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  {t.backReview}
-                </button>
-              </>
-            )}
-
-            {p.status === "Published" && (
-              <div className="flex flex-wrap items-center gap-2 text-xs text-emerald-400 font-medium">
-                <Check className="size-4 text-emerald-400" />
-                <span>
-                  {isAr
-                    ? `منشور ومؤكد على ${PLAT[p.platform]}`
-                    : `Published & verified on ${PLAT[p.platform]}`}
-                </span>
-                {p.publishedExternalUrl && (
-                  <a
-                    href={p.publishedExternalUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 text-cyan-300 underline hover:text-cyan-200 ms-1 font-semibold"
-                  >
-                    <span>
-                      {p.platform === "instagram"
-                        ? isAr
-                          ? "مشاهدة على إنستغرام"
-                          : "View on Instagram"
-                        : p.platform === "facebook"
-                          ? isAr
-                            ? "مشاهدة على فيسبوك"
-                            : "View on Facebook"
-                          : isAr
-                            ? "مشاهدة على تيك توك"
-                            : "View on TikTok"}
-                    </span>
-                    <ExternalLink className="size-3" />
-                  </a>
-                )}
-                <button
-                  onClick={() => update(p.id, { status: "Needs Review" })}
-                  className="text-[11px] text-muted-foreground hover:text-foreground underline ms-auto"
-                >
-                  {isAr ? "تعديل أو إعادة جدولة" : "Edit / Reschedule"}
-                </button>
-              </div>
-            )}
-
-            {p.status !== "Published" && (
-              <button
-                onClick={() => setEditing(true)}
-                className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-secondary"
-              >
-                <Pencil className="size-3.5" />
-                {t.edit}
-              </button>
-            )}
-
-            <button
-              onClick={remove}
-              className="ms-auto flex items-center gap-1 rounded-md px-2 py-1.5 text-destructive hover:bg-destructive/10"
-              aria-label={t.del}
-            >
-              <Trash2 className="size-4" />
-            </button>
-          </div>
+        <div
+          role="status"
+          className="mt-auto border-t border-border pt-3 text-xs text-muted-foreground"
+        >
+          {isAr
+            ? "المراجعة والموافقة والجدولة ستُفعّل بعد ربط RPC الموظفين المعتمد؛ لا تغيير حالة محلي أو نشر من هذه الشاشة."
+            : "Review, approval, and scheduling will be enabled after the approved staff RPCs are connected; this screen does not change status or publish."}
         </div>
       )}
     </article>

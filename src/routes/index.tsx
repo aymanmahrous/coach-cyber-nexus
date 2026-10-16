@@ -441,34 +441,9 @@ function CockpitShell({
       ].slice(0, 50),
     );
 
-  // Configuration status only (no live connection checks exist yet).
+  // No legacy provider status endpoints are used in the official product.
   type Cfg = "checking" | "configured" | "off" | "nocheck";
-  const [cfg, setCfg] = useState<{ fb: Cfg; ig: Cfg; canva: Cfg }>({
-    fb: "checking",
-    ig: "checking",
-    canva: "checking",
-  });
-  useEffect(() => {
-    let alive = true;
-    const map = (v: unknown): Cfg =>
-      v === "configured_unverified" ? "configured" : v === "not_configured" ? "off" : "nocheck";
-    Promise.allSettled([
-      fetch("/api/publish").then((r) => (r.ok ? r.json() : Promise.reject())),
-      fetch("/api/canva").then((r) => (r.ok ? r.json() : Promise.reject())),
-    ]).then(([pub, cv]) => {
-      if (!alive) return;
-      const p = pub.status === "fulfilled" ? pub.value : null;
-      const c = cv.status === "fulfilled" ? cv.value : null;
-      setCfg({
-        fb: p ? map(p.facebook) : "nocheck",
-        ig: p ? map(p.instagram) : "nocheck",
-        canva: c ? (c.configured ? "configured" : "off") : "nocheck",
-      });
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const cfg: { fb: Cfg; ig: Cfg; canva: Cfg } = { fb: "nocheck", ig: "nocheck", canva: "nocheck" };
   const channels: { name: string; st: Cfg }[] = [
     { name: isAr ? "واتساب" : "WhatsApp", st: "nocheck" },
     { name: isAr ? "فيسبوك" : "Facebook", st: cfg.fb },
