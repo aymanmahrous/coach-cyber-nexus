@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiBrainRouteImport } from './routes/api/brain'
 import { Route as ApiCanvaRouteImport } from './routes/api/canva'
+import { Route as ApiMetaWebhookRouteImport } from './routes/api/meta-webhook'
 import { Route as ApiPublishRouteImport } from './routes/api/publish'
 
 const IndexRoute = IndexRouteImport.update({
@@ -29,6 +30,11 @@ const ApiCanvaRoute = ApiCanvaRouteImport.update({
   path: '/api/canva',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMetaWebhookRoute = ApiMetaWebhookRouteImport.update({
+  id: '/api/meta-webhook',
+  path: '/api/meta-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublishRoute = ApiPublishRouteImport.update({
   id: '/api/publish',
   path: '/api/publish',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/brain': typeof ApiBrainRoute
   '/api/canva': typeof ApiCanvaRoute
+  '/api/meta-webhook': typeof ApiMetaWebhookRoute
   '/api/publish': typeof ApiPublishRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/brain': typeof ApiBrainRoute
   '/api/canva': typeof ApiCanvaRoute
+  '/api/meta-webhook': typeof ApiMetaWebhookRoute
   '/api/publish': typeof ApiPublishRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,29 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/api/brain': typeof ApiBrainRoute
   '/api/canva': typeof ApiCanvaRoute
+  '/api/meta-webhook': typeof ApiMetaWebhookRoute
   '/api/publish': typeof ApiPublishRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/brain' | '/api/canva' | '/api/publish'
+  fullPaths:
+    '/' | '/api/brain' | '/api/canva' | '/api/meta-webhook' | '/api/publish'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/brain' | '/api/canva' | '/api/publish'
-  id: '__root__' | '/' | '/api/brain' | '/api/canva' | '/api/publish'
+  to: '/' | '/api/brain' | '/api/canva' | '/api/meta-webhook' | '/api/publish'
+  id:
+    | '__root__'
+    | '/'
+    | '/api/brain'
+    | '/api/canva'
+    | '/api/meta-webhook'
+    | '/api/publish'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiBrainRoute: typeof ApiBrainRoute
   ApiCanvaRoute: typeof ApiCanvaRoute
+  ApiMetaWebhookRoute: typeof ApiMetaWebhookRoute
   ApiPublishRoute: typeof ApiPublishRoute
 }
 
@@ -92,6 +109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCanvaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meta-webhook': {
+      id: '/api/meta-webhook'
+      path: '/api/meta-webhook'
+      fullPath: '/api/meta-webhook'
+      preLoaderRoute: typeof ApiMetaWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/publish': {
       id: '/api/publish'
       path: '/api/publish'
@@ -106,6 +130,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiBrainRoute: ApiBrainRoute,
   ApiCanvaRoute: ApiCanvaRoute,
+  ApiMetaWebhookRoute: ApiMetaWebhookRoute,
   ApiPublishRoute: ApiPublishRoute,
 }
 export const routeTree = rootRouteImport
