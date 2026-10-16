@@ -9,6 +9,7 @@ import {
   authErrorMessage,
   clearStoredAccessToken,
   readStoredAccessToken,
+  requestPasswordReset,
   restoreSession,
   signIn,
   storeAccessToken,
@@ -224,7 +225,9 @@ function Login({ onAuthenticated }: { onAuthenticated: (session: OfficialStaffSe
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
   const [language, setLanguage] = useState<Lang>("ar");
   const isAr = language === "ar";
 
@@ -233,6 +236,7 @@ function Login({ onAuthenticated }: { onAuthenticated: (session: OfficialStaffSe
     if (busy || !email.trim() || !password) return;
     setBusy(true);
     setError(null);
+    setResetNotice(null);
     try {
       const session = await signIn(email, password);
       storeAccessToken(session.accessToken);
@@ -243,6 +247,27 @@ function Login({ onAuthenticated }: { onAuthenticated: (session: OfficialStaffSe
       setError(authErrorMessage(code as Parameters<typeof authErrorMessage>[0], language));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function forgotPassword() {
+    if (busy || resetBusy || !email.trim()) return;
+    setResetBusy(true);
+    setError(null);
+    setResetNotice(null);
+    try {
+      await requestPasswordReset(email);
+      setResetNotice(
+        isAr
+          ? "إذا كان البريد مسجلاً، ستصلك رسالة لإعادة تعيين كلمة المرور."
+          : "If the email is registered, a password reset message will be sent.",
+      );
+    } catch (cause) {
+      const code =
+        cause instanceof Error && "code" in cause ? String(cause.code) : "SERVICE_UNAVAILABLE";
+      setError(authErrorMessage(code as Parameters<typeof authErrorMessage>[0], language));
+    } finally {
+      setResetBusy(false);
     }
   }
 
@@ -269,7 +294,7 @@ function Login({ onAuthenticated }: { onAuthenticated: (session: OfficialStaffSe
             {isAr ? "EN" : "عربي"}
           </button>
         </div>
-        <form className="space-y-4" onSubmit={submit}>
+        <form className="space-y-4" onSubmit={submit} aria-busy={busy || resetBusy}>
           <label className="block text-sm">
             {isAr ? "البريد الإلكتروني" : "Email"}
             <input
@@ -292,6 +317,22 @@ function Login({ onAuthenticated }: { onAuthenticated: (session: OfficialStaffSe
               required
             />
           </label>
+          <button
+            type="button"
+            className="text-sm text-primary underline-offset-4 hover:underline disabled:opacity-50"
+            disabled={busy || resetBusy || !email.trim()}
+            onClick={() => void forgotPassword()}
+          >
+            {isAr ? "نسيت كلمة المرور؟" : "Forgot password?"}
+          </button>
+          {resetNotice && (
+            <div
+              className="rounded-lg border border-accent/40 bg-accent/10 p-3 text-sm text-accent"
+              role="status"
+            >
+              {resetNotice}
+            </div>
+          )}
           {error && (
             <p className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               {error}
@@ -300,9 +341,19 @@ function Login({ onAuthenticated }: { onAuthenticated: (session: OfficialStaffSe
           <button
             className="w-full rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground disabled:opacity-50"
             type="submit"
-            disabled={busy || !email.trim() || !password}
+            disabled={busy || resetBusy || !email.trim() || !password}
           >
-            {busy ? (isAr ? "جارٍ التحقق…" : "Verifying…") : isAr ? "دخول آمن" : "Secure sign in"}
+            {busy
+              ? isAr
+                ? "جارٍ التحقق…"
+                : "Verifying…"
+              : resetBusy
+                ? isAr
+                  ? "جارٍ إرسال الرابط…"
+                  : "Sending reset link…"
+                : isAr
+                  ? "دخول آمن"
+                  : "Secure sign in"}
           </button>
         </form>
       </section>
@@ -513,10 +564,10 @@ function CockpitShell({
           />
         )}
         <div className={tab === "brain" ? "" : "hidden"}>
-          <BrainView t={t} log={log} setBrainState={setBrainState} />
+          <BrainView t={t} log={log} setBrainState={setBrainState} session={session} />
         </div>
         {tab === "factory" && <ContentFactory lang={lang} log={log} session={session} />}
-        {tab === "whatsapp" && <WhatsAppHub lang={lang} log={log} />}
+        {tab === "whatsapp" && <WhatsAppHub lang={lang} log={log} session={session} />}
         {tab === "vault" && <MediaVault lang={lang} log={log} />}
       </main>
     </div>
@@ -756,10 +807,12 @@ function BrainView({
   t,
   log,
   setBrainState,
+  session,
 }: {
   t: TT;
   log: (s: string, tone?: Note["tone"]) => void;
   setBrainState: (s: "ready" | "online" | "err") => void;
+  session: OfficialStaffSession;
 }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -783,7 +836,10 @@ function BrainView({
     try {
       const res = await fetch("/api/brain", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.accessToken}`,
+        },
         body: JSON.stringify({ messages: next }),
         signal: ac.signal,
       });

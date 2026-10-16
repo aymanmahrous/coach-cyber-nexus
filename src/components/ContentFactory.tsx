@@ -236,7 +236,10 @@ Return ONLY valid JSON, no markdown fences, matching this structure:
     try {
       const res = await fetch("/api/brain", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.accessToken}`,
+        },
         body: JSON.stringify({ messages: [{ role: "user", content: prompt }] }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -313,7 +316,10 @@ Return ONLY valid JSON matching this structure:
     try {
       const res = await fetch("/api/brain", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.accessToken}`,
+        },
         body: JSON.stringify({ messages: [{ role: "user", content: prompt }] }),
       });
       if (!res.ok) throw new Error(await res.text());

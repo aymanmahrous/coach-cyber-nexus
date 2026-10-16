@@ -4,6 +4,13 @@ import { withTimeout } from "@/lib/integration-guards";
 
 const PROVIDER_TIMEOUT_MS = 30_000;
 const GATEWAY_TIMEOUT_MS = 60_000;
+const SUPABASE_URL = (process.env["VITE_SUPABASE_URL"] || "").trim().replace(/\/$/, "");
+const SUPABASE_KEY = (
+  process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+  process.env["VITE_SUPABASE_ANON_KEY"] ||
+  ""
+).trim();
+const STAFF_TABLE = (process.env["VITE_STAFF_PROFILE_TABLE"] || "staff_profiles").trim();
 
 const SYSTEM = `You are "Coach Brain", the expert AI advisor, head swimming coach, and operating sales engine for Coach Ayman Swimming & Relax Fix Hub in Abu Dhabi.
 Reply in the user's language (Arabic by default, or English if asked). Be concise, practical, authoritative, and structured with markdown.
@@ -40,10 +47,41 @@ const Body = z.object({
     .max(40),
 });
 
+async function requireStaffSession(request: Request): Promise<Response | null> {
+  const authorization = request.headers.get("authorization") || "";
+  const accessToken = authorization.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  if (!SUPABASE_URL || !SUPABASE_KEY || !accessToken) {
+    return new Response("Staff authentication required", { status: 401 });
+  }
+  const headers = {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${accessToken}`,
+    Accept: "application/json",
+  };
+  const userResponse = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers,
+    cache: "no-store",
+  }).catch(() => null);
+  if (!userResponse?.ok) return new Response("Session expired", { status: 401 });
+  const user = (await userResponse.json().catch(() => null)) as { id?: unknown } | null;
+  if (!user || typeof user.id !== "string") return new Response("Session expired", { status: 401 });
+  const profileResponse = await fetch(
+    `${SUPABASE_URL}/rest/v1/${encodeURIComponent(STAFF_TABLE)}?id=eq.${encodeURIComponent(user.id)}&select=active&limit=1`,
+    { headers, cache: "no-store" },
+  ).catch(() => null);
+  if (!profileResponse?.ok) return new Response("Staff authorization unavailable", { status: 503 });
+  const profiles = (await profileResponse.json().catch(() => [])) as Array<{ active?: unknown }>;
+  if (profiles.length !== 1 || profiles[0]?.active !== true)
+    return new Response("Staff access denied", { status: 403 });
+  return null;
+}
+
 export const Route = createFileRoute("/api/brain")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const authFailure = await requireStaffSession(request);
+        if (authFailure) return authFailure;
         const parsed = Body.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return new Response("Invalid request payload", { status: 400 });
 

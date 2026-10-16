@@ -96,6 +96,23 @@ export async function signIn(email: string, password: string): Promise<OfficialS
   return loadStaffProfile(auth.access_token, auth.user.id);
 }
 
+export async function requestPasswordReset(email: string): Promise<void> {
+  requireConfiguration();
+  let response: Response;
+  try {
+    response = await fetch(`${SUPABASE_URL}/auth/v1/recover`, {
+      method: "POST",
+      headers: { ...publicHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim() }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new OfficialAuthError("SERVICE_UNAVAILABLE");
+  }
+  if (response.status === 429) throw new OfficialAuthError("TOO_MANY_ATTEMPTS");
+  if (!response.ok) throw new OfficialAuthError("SERVICE_UNAVAILABLE");
+}
+
 export async function restoreSession(
   accessToken: string,
   signal?: AbortSignal,
