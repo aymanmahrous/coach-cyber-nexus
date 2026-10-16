@@ -100,7 +100,7 @@ const L = {
     },
     platforms: "المنصات المستهدفة",
     topic: "فكرة أو موضوع مخصص (اختياري)",
-    topicPh: "مثال: تصحيح النفس في السباحة الحرة، أو عروض فرع مدينة خليفة والمشرف",
+    topicPh: "مثال: تدريب التنفس أو موضوع فرع موثق في معرفة الأكاديمية",
     generate: "توليد محتوى متنوع بكوتش براين",
     generating: "كوتش براين يصيغ المحتوى…",
     manual: "إضافة منشور يدوي",
@@ -131,8 +131,6 @@ const L = {
       "حماية الأكاديمية: لا يتم النشر أو سحب رصيد تلقائياً. الخطط والمنشورات تُحفظ على هذا الجهاز فقط؛ لا تُجدول أو تُنشر على المنصات إلا بعد ربط الحسابات وموافقتك اليدوية.",
     err: "تعذر التوليد",
     needWhen: "حدد موعد وتاريخ النشر أولاً",
-    fbPage: "صفحة فيسبوك: 1164107840123575",
-    igAccount: "إنستغرام: 17841439747493221",
   },
   en: {
     title: "Smart Content Factory",
@@ -145,7 +143,7 @@ const L = {
     },
     platforms: "Platforms",
     topic: "Custom Topic / Focus (optional)",
-    topicPh: "e.g. Freestyle breathing drill or Khalifa City branch special",
+    topicPh: "e.g. a breathing drill or a branch topic verified in Academy Knowledge",
     generate: "Generate Varied Content with AI",
     generating: "Coach Brain is crafting content…",
     manual: "Add Manual Post",
@@ -176,8 +174,6 @@ const L = {
       "Academy Protection: No automatic publishing or ad spend. Plans and posts are saved on this device only; they are not scheduled on social platforms unless accounts are connected and you manually approve.",
     err: "Generation failed",
     needWhen: "Select publish time first",
-    fbPage: "Facebook Page: 1164107840123575",
-    igAccount: "Instagram: 17841439747493221",
   },
 };
 
@@ -219,9 +215,7 @@ Requested post count: ${n}
 Target Platforms: ${plats.map((p) => PLAT[p]).join(", ")}.
 Topic Focus: ${topic || "Mix of technique correction, fear of water progressive therapy, and Abu Dhabi pool branches"}.
 Language: ${lang === "ar" ? "Gulf-friendly professional Arabic" : "English"}.
-Official Booking WhatsApp: 058 821 9130.
-Pool branches: Al Mushrif, Al Falah, Khalifa City, Al Danah.
-STRICT MARKETING RULE: DO NOT put numerical prices (AED) in the public social post captions or visuals! Focus on technique, overcoming water fear, and invite people to inquire via WhatsApp: 058 821 9130. Prices are reserved for qualified leads in private chat. Never invent customer testimonials, results, schedules, limited availability, or facility/safety claims. If TikTok is selected, every TikTok post must use a vertical 9:16 drill or quiz format.
+Use only Academy-specific facts available in the protected Academy Knowledge context. If a contact, branch, offer, or service detail is not present there, omit it rather than guessing. NEVER include prices or numerical amounts in public social captions or visuals, even when present in Academy Knowledge. Never invent testimonials, results, schedules, availability, or facility/safety claims. If TikTok is selected, every TikTok post must use a vertical 9:16 drill or quiz format.
 
 CRITICAL INSTRUCTION: DO NOT use the same visual format or template for all posts! Vary the template style across:
 1) "drill" (9:16 vertical video reel with 3s hook)
@@ -297,9 +291,7 @@ Return ONLY valid JSON, no markdown fences, matching this structure:
     const prompt = `Create a full 7-day social media publishing schedule for Coach Ayman Swimming Academy in Abu Dhabi.
 Requested post count: 7
 Target Platforms: ${plats.map((p) => PLAT[p]).join(", ")}.
-Official Booking WhatsApp: 058 821 9130.
-Pool branches: Al Mushrif, Al Falah, Khalifa City, Al Danah.
-STRICT MARKETING RULE: DO NOT include numerical prices (AED) in the public captions or visuals! Invite people to inquire via WhatsApp 058 821 9130. Never invent customer testimonials, results, schedules, limited availability, or facility/safety claims. If TikTok is selected, every TikTok post must use a vertical 9:16 drill or quiz format.
+Use only Academy-specific facts available in the protected Academy Knowledge context. If a contact, branch, offer, or service detail is not present there, omit it rather than guessing. NEVER include prices or numerical amounts in public captions or visuals, even when present in Academy Knowledge. Never invent testimonials, results, schedules, availability, or facility/safety claims. If TikTok is selected, every TikTok post must use a vertical 9:16 drill or quiz format.
 
 CRITICAL: Return exactly 7 varied posts across all 5 styles:
 1) drill (9:16 vertical video reel with 3s hook)
@@ -410,10 +402,6 @@ Return ONLY valid JSON matching this structure:
       <section className="glass space-y-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-display text-sm tracking-wider text-primary">{t.title}</h2>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="rounded bg-secondary px-2 py-0.5 font-mono">{t.fbPage}</span>
-            <span className="rounded bg-secondary px-2 py-0.5 font-mono">{t.igAccount}</span>
-          </div>
         </div>
 
         <div>
