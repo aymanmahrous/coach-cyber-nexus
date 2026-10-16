@@ -439,7 +439,12 @@ export async function dispatchMetaReply(
   recipientId: string,
   replyText: string,
   customFetch: typeof fetch = fetch,
-): Promise<{ ok: boolean; id?: string | undefined; error?: string | undefined }> {
+): Promise<{ ok: boolean; id?: string | undefined; error?: string | undefined; dryRun?: boolean }> {
+  const whatsappDryRun = (process.env["WHATSAPP_SEND_DRY_RUN"] || "true").trim().toLowerCase() !== "false";
+  if (channel === "whatsapp" && whatsappDryRun) {
+    return { ok: true, id: "dry-run", dryRun: true };
+  }
+
   const requestConfig = formatMetaOutboundPayload(channel, recipientId, replyText);
   if (!requestConfig) {
     return { ok: false, error: "channel_credentials_missing" };

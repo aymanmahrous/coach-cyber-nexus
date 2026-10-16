@@ -296,6 +296,7 @@ describe("Official Outbound Dispatchers", () => {
   it("dispatches reply and records verification on success", async () => {
     process.env["WHATSAPP_PHONE_NUMBER_ID"] = "1000123";
     process.env["WHATSAPP_CLOUD_ACCESS_TOKEN"] = "token_wa_test";
+    process.env["WHATSAPP_SEND_DRY_RUN"] = "false";
 
     const mockFetch = (async () => {
       return new Response(JSON.stringify({ messages: [{ id: "wamid_sent_999" }] }), {
@@ -307,6 +308,21 @@ describe("Official Outbound Dispatchers", () => {
     const res = await dispatchMetaReply("whatsapp", "971500000001", "تم الإرسال بنجاح", mockFetch);
     expect(res.ok).toBe(true);
     expect(res.id).toBe("wamid_sent_999");
+  });
+
+  it("keeps WhatsApp dispatch in dry-run by default and does not call Meta", async () => {
+    process.env["WHATSAPP_PHONE_NUMBER_ID"] = "1000123";
+    process.env["WHATSAPP_CLOUD_ACCESS_TOKEN"] = "token_wa_test";
+    delete process.env["WHATSAPP_SEND_DRY_RUN"];
+    let called = false;
+    const mockFetch = (async () => {
+      called = true;
+      return new Response(JSON.stringify({ messages: [{ id: "should_not_send" }] }), { status: 200 });
+    }) as any;
+
+    const res = await dispatchMetaReply("whatsapp", "971500000001", "رسالة اختبار آمنة", mockFetch);
+    expect(res).toEqual({ ok: true, id: "dry-run", dryRun: true });
+    expect(called).toBe(false);
   });
 });
 
