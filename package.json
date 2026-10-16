@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "deploy": "npm run build && npx nitro deploy --prebuilt",
-    "deploy:cloudflare": "npm run build && npx nitro deploy --prebuilt"
+    "deploy:cloudflare": "npm run build && npx nitro deploy --prebuilt",
+    "test": "vitest run"
   },
   "overrides": {
     "rolldown": "1.2.1"
