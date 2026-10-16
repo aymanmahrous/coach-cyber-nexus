@@ -8,7 +8,9 @@
 
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
 const SUPABASE_KEY = (
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || ""
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  ""
 ).trim();
 
 export type OfficialSession = {
@@ -21,7 +23,8 @@ export type OfficialSession = {
 export class OfficialBackendError extends Error {
   constructor(
     message: string,
-    readonly code: "SETUP_REQUIRED" | "SESSION_EXPIRED" | "FORBIDDEN" | "REQUEST_FAILED" | "INVALID_RESPONSE",
+    readonly code:
+      "SETUP_REQUIRED" | "SESSION_EXPIRED" | "FORBIDDEN" | "REQUEST_FAILED" | "INVALID_RESPONSE",
     readonly status?: number,
   ) {
     super(message);
@@ -46,9 +49,12 @@ function headers(session: Pick<OfficialSession, "accessToken">): HeadersInit {
 }
 
 async function parseResponse(response: Response): Promise<unknown> {
-  if (response.status === 401) throw new OfficialBackendError("Session expired", "SESSION_EXPIRED", 401);
-  if (response.status === 403) throw new OfficialBackendError("Staff access denied", "FORBIDDEN", 403);
-  if (!response.ok) throw new OfficialBackendError("Backend request failed", "REQUEST_FAILED", response.status);
+  if (response.status === 401)
+    throw new OfficialBackendError("Session expired", "SESSION_EXPIRED", 401);
+  if (response.status === 403)
+    throw new OfficialBackendError("Staff access denied", "FORBIDDEN", 403);
+  if (!response.ok)
+    throw new OfficialBackendError("Backend request failed", "REQUEST_FAILED", response.status);
   return response.json().catch(() => null);
 }
 
