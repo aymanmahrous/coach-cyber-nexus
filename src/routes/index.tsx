@@ -1,10 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import { ContentFactory } from "@/components/ContentFactory";
 import { WhatsAppHub } from "@/components/WhatsAppHub";
 import { MediaVault } from "@/components/MediaVault";
 import { usePosts } from "@/lib/posts";
+import {
+  authErrorMessage,
+  clearStoredAccessToken,
+  readStoredAccessToken,
+  requestPasswordReset,
+  restoreSession,
+  signIn,
+  storeAccessToken,
+  type OfficialStaffSession,
+} from "@/lib/official-auth";
 import {
   Activity,
   Bell,
@@ -55,9 +65,12 @@ const T = {
       whatsapp: "واتساب",
       vault: "الوسائط",
     },
-    online: "متصل",
-    offline: "غير مربوط",
-    ready: "جاهز",
+    online: "متحقق",
+    offline: "غير مهيأ",
+    ready: "لم يُتحقق بعد",
+    configured: "مُهيأ / لم يُتحقق",
+    noCheck: "لا يوجد فحص",
+    checking: "جارٍ الفحص…",
     notif: "مركز الإشعارات",
     noNotif: "لا توجد أحداث بعد. كل حركة في النظام ستظهر هنا.",
     clear: "مسح",
@@ -128,9 +141,12 @@ const T = {
       whatsapp: "WhatsApp",
       vault: "Media Vault",
     },
-    online: "Online",
-    offline: "Not linked",
-    ready: "Ready",
+    online: "Verified",
+    offline: "Not configured",
+    ready: "Not verified yet",
+    configured: "Configured / unverified",
+    noCheck: "No check available",
+    checking: "Checking…",
     notif: "Notification Center",
     noNotif: "No events yet. Every system action appears here.",
     clear: "Clear",
@@ -205,8 +221,201 @@ const TABS: { id: Tab; icon: typeof Gauge }[] = [
   { id: "whatsapp", icon: MessageCircle },
   { id: "vault", icon: FolderOpen },
 ];
+function Login({ onAuthenticated }: { onAuthenticated: (session: OfficialStaffSession) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resetNotice, setResetNotice] = useState<string | null>(null);
+  const [language, setLanguage] = useState<Lang>("ar");
+  const isAr = language === "ar";
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || !email.trim() || !password) return;
+    setBusy(true);
+    setError(null);
+    setResetNotice(null);
+    try {
+      const session = await signIn(email, password);
+      storeAccessToken(session.accessToken);
+      onAuthenticated(session);
+    } catch (cause) {
+      const code =
+        cause instanceof Error && "code" in cause ? String(cause.code) : "SERVICE_UNAVAILABLE";
+      setError(authErrorMessage(code as Parameters<typeof authErrorMessage>[0], language));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function forgotPassword() {
+    if (busy || resetBusy || !email.trim()) return;
+    setResetBusy(true);
+    setError(null);
+    setResetNotice(null);
+    try {
+      await requestPasswordReset(email);
+      setResetNotice(
+        isAr
+          ? "إذا كان البريد مسجلاً، ستصلك رسالة لإعادة تعيين كلمة المرور."
+          : "If the email is registered, a password reset message will be sent.",
+      );
+    } catch (cause) {
+      const code =
+        cause instanceof Error && "code" in cause ? String(cause.code) : "SERVICE_UNAVAILABLE";
+      setError(authErrorMessage(code as Parameters<typeof authErrorMessage>[0], language));
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
+      <section className="glass w-full max-w-md p-6">
+        <div className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <p className="font-mono text-xs uppercase tracking-widest text-primary">
+              Official product
+            </p>
+            <h1 className="mt-2 font-display text-xl text-primary glow-text">
+              {isAr ? "دخول التطبيق الرسمي" : "Official product sign in"}
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isAr ? "للموظفين المفعّلين فقط" : "Active staff only"}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground"
+            onClick={() => setLanguage(isAr ? "en" : "ar")}
+          >
+            {isAr ? "EN" : "عربي"}
+          </button>
+        </div>
+        <form className="space-y-4" onSubmit={submit} aria-busy={busy || resetBusy}>
+          <label className="block text-sm">
+            {isAr ? "البريد الإلكتروني" : "Email"}
+            <input
+              className="mt-1 w-full rounded-lg border border-input bg-background/60 px-3 py-2 outline-none focus:border-primary"
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
+          </label>
+          <label className="block text-sm">
+            {isAr ? "كلمة المرور" : "Password"}
+            <input
+              className="mt-1 w-full rounded-lg border border-input bg-background/60 px-3 py-2 outline-none focus:border-primary"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </label>
+          <button
+            type="button"
+            className="text-sm text-primary underline-offset-4 hover:underline disabled:opacity-50"
+            disabled={busy || resetBusy || !email.trim()}
+            onClick={() => void forgotPassword()}
+          >
+            {isAr ? "نسيت كلمة المرور؟" : "Forgot password?"}
+          </button>
+          {resetNotice && (
+            <div
+              className="rounded-lg border border-accent/40 bg-accent/10 p-3 text-sm text-accent"
+              role="status"
+            >
+              {resetNotice}
+            </div>
+          )}
+          {error && (
+            <p className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          <button
+            className="w-full rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground disabled:opacity-50"
+            type="submit"
+            disabled={busy || resetBusy || !email.trim() || !password}
+          >
+            {busy
+              ? isAr
+                ? "جارٍ التحقق…"
+                : "Verifying…"
+              : resetBusy
+                ? isAr
+                  ? "جارٍ إرسال الرابط…"
+                  : "Sending reset link…"
+                : isAr
+                  ? "دخول آمن"
+                  : "Secure sign in"}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
+function AuthGate({
+  children,
+}: {
+  children: (session: OfficialStaffSession, signOut: () => void) => ReactNode;
+}) {
+  const [session, setSession] = useState<OfficialStaffSession | null>(null);
+  const [restoring, setRestoring] = useState(true);
+
+  useEffect(() => {
+    const accessToken = readStoredAccessToken();
+    if (!accessToken) {
+      setRestoring(false);
+      return;
+    }
+    const controller = new AbortController();
+    restoreSession(accessToken, controller.signal)
+      .then(setSession)
+      .catch(() => clearStoredAccessToken())
+      .finally(() => setRestoring(false));
+    return () => controller.abort();
+  }, []);
+
+  if (restoring) {
+    return (
+      <main className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+        جاري التحقق من الجلسة والموظف النشط…
+      </main>
+    );
+  }
+  if (!session) return <Login onAuthenticated={setSession} />;
+  return (
+    <>
+      {children(session, () => {
+        clearStoredAccessToken();
+        setSession(null);
+      })}
+    </>
+  );
+}
 
 function Cockpit() {
+  return (
+    <AuthGate>
+      {(session, signOut) => <CockpitShell session={session} onSignOut={signOut} />}
+    </AuthGate>
+  );
+}
+
+function CockpitShell({
+  session,
+  onSignOut,
+}: {
+  session: OfficialStaffSession;
+  onSignOut: () => void;
+}) {
   const [lang, setLang] = useState<Lang>("ar");
   const [tab, setTab] = useState<Tab>("cockpit");
   const [notes, setNotes] = useState<Note[]>([]);
@@ -232,12 +441,49 @@ function Cockpit() {
       ].slice(0, 50),
     );
 
-  const channels = [
-    { name: isAr ? "واتساب (058 821 9130)" : "WhatsApp", on: true },
-    { name: isAr ? "فيسبوك وماسنجر" : "Facebook & Messenger", on: true },
-    { name: isAr ? "إنستغرام (@RelaxFixUAE)" : "Instagram", on: true },
-    { name: isAr ? "Canva & Gemini AI" : "Canva & Gemini", on: true },
+  // Configuration status only (no live connection checks exist yet).
+  type Cfg = "checking" | "configured" | "off" | "nocheck";
+  const [cfg, setCfg] = useState<{ fb: Cfg; ig: Cfg; canva: Cfg }>({
+    fb: "checking",
+    ig: "checking",
+    canva: "checking",
+  });
+  useEffect(() => {
+    let alive = true;
+    const map = (v: unknown): Cfg =>
+      v === "configured_unverified" ? "configured" : v === "not_configured" ? "off" : "nocheck";
+    Promise.allSettled([
+      fetch("/api/publish").then((r) => (r.ok ? r.json() : Promise.reject())),
+      fetch("/api/canva").then((r) => (r.ok ? r.json() : Promise.reject())),
+    ]).then(([pub, cv]) => {
+      if (!alive) return;
+      const p = pub.status === "fulfilled" ? pub.value : null;
+      const c = cv.status === "fulfilled" ? cv.value : null;
+      setCfg({
+        fb: p ? map(p.facebook) : "nocheck",
+        ig: p ? map(p.instagram) : "nocheck",
+        canva: c ? (c.configured ? "configured" : "off") : "nocheck",
+      });
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const channels: { name: string; st: Cfg }[] = [
+    { name: isAr ? "واتساب" : "WhatsApp", st: "nocheck" },
+    { name: isAr ? "فيسبوك" : "Facebook", st: cfg.fb },
+    { name: isAr ? "إنستغرام" : "Instagram", st: cfg.ig },
+    { name: "TikTok", st: "nocheck" },
+    { name: "Canva", st: cfg.canva },
   ];
+  const cfgLabel = (st: Cfg) =>
+    st === "configured"
+      ? t.configured
+      : st === "off"
+        ? t.offline
+        : st === "checking"
+          ? t.checking
+          : t.noCheck;
 
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl flex-col gap-4 p-3 md:p-6">
@@ -260,18 +506,28 @@ function Cockpit() {
               className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-muted-foreground"
             >
               <span
-                className={`size-2 rounded-full ${c.on ? "bg-accent" : "bg-muted-foreground/50"}`}
+                className={`size-2 rounded-full ${c.st === "configured" ? "bg-warning" : "bg-muted-foreground/50"}`}
               />
-              {c.name} · {c.on ? t.online : t.offline}
+              {c.name} · {cfgLabel(c.st)}
             </span>
           ))}
           <span className="flex items-center gap-1.5 rounded-full border border-primary/40 px-2.5 py-1 text-primary">
             <span
-              className={`size-2 rounded-full ${brainState === "err" ? "bg-destructive" : "animate-pulse bg-accent"}`}
+              className={`size-2 rounded-full ${brainState === "err" ? "bg-destructive" : brainState === "online" ? "bg-accent" : "bg-muted-foreground/50"}`}
             />
             Coach Brain ·{" "}
             {brainState === "online" ? t.online : brainState === "err" ? "ERR" : t.ready}
           </span>
+          <span className="rounded-full border border-border px-2.5 py-1 text-muted-foreground">
+            {session.displayName} · {session.role}
+          </span>
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="rounded-full border border-border px-2.5 py-1 text-muted-foreground hover:text-foreground"
+          >
+            {isAr ? "خروج" : "Sign out"}
+          </button>
           <button
             onClick={() => {
               setLang(lang === "ar" ? "en" : "ar");
@@ -299,13 +555,19 @@ function Cockpit() {
 
       <main className="flex-1">
         {tab === "cockpit" && (
-          <CockpitView t={t} notes={notes} clear={() => setNotes([])} go={setTab} />
+          <CockpitView
+            t={t}
+            notes={notes}
+            clear={() => setNotes([])}
+            go={setTab}
+            session={session}
+          />
         )}
         <div className={tab === "brain" ? "" : "hidden"}>
-          <BrainView t={t} log={log} setBrainState={setBrainState} />
+          <BrainView t={t} log={log} setBrainState={setBrainState} session={session} />
         </div>
-        {tab === "factory" && <ContentFactory lang={lang} log={log} />}
-        {tab === "whatsapp" && <WhatsAppHub lang={lang} log={log} />}
+        {tab === "factory" && <ContentFactory lang={lang} log={log} session={session} />}
+        {tab === "whatsapp" && <WhatsAppHub lang={lang} log={log} session={session} />}
         {tab === "vault" && <MediaVault lang={lang} log={log} />}
       </main>
     </div>
@@ -346,16 +608,18 @@ function CockpitView({
   notes,
   clear,
   go,
+  session,
 }: {
   t: TT;
   notes: Note[];
   clear: () => void;
   go: (t: Tab) => void;
+  session: OfficialStaffSession;
 }) {
   const goBrain = () => go("brain");
   const cols = ["Scheduled", "Claimed", "Published", "Needs Review"] as const;
   const [demo, setDemo] = useState(false);
-  const { posts } = usePosts();
+  const { posts } = usePosts(session);
   const cnt = (st: string) => posts.filter((p) => p.status === st).length;
   const kpis = [
     {
@@ -543,10 +807,12 @@ function BrainView({
   t,
   log,
   setBrainState,
+  session,
 }: {
   t: TT;
   log: (s: string, tone?: Note["tone"]) => void;
   setBrainState: (s: "ready" | "online" | "err") => void;
+  session: OfficialStaffSession;
 }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -570,7 +836,10 @@ function BrainView({
     try {
       const res = await fetch("/api/brain", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.accessToken}`,
+        },
         body: JSON.stringify({ messages: next }),
         signal: ac.signal,
       });
