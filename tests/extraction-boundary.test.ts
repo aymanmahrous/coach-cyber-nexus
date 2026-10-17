@@ -19,6 +19,13 @@ describe("official product extraction boundary", () => {
     expect(env).not.toMatch(/OWNER_PUBLISH_PIN|FACEBOOK_PAGE_ACCESS_TOKEN|INSTAGRAM_ACCESS_TOKEN/);
   });
 
+  it("does not advertise disabled external media integrations as available", () => {
+    const home = read("src/routes/index.tsx");
+    expect(home).toContain("External account integrations are not available in this build.");
+    expect(home).toContain("ربط الحسابات الخارجية غير متاح في هذا الإصدار.");
+    expect(home).not.toMatch(/link Google Drive, Photos, Dropbox, Canva/);
+  });
+
   it("uses an authenticated, active staff profile for the shared session gate", () => {
     const auth = read("src/lib/official-auth.ts");
     const brain = read("src/routes/api/brain.ts");

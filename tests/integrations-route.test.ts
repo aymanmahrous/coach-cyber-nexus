@@ -26,11 +26,12 @@ describe("Honest Integrations Evaluation API", () => {
     }
   });
 
-  it("does not claim Canva is connected when durable authorization is not inspected", () => {
+  it("keeps Canva blocked while the legacy OAuth flow is not wired into this build", () => {
     const list = evaluateIntegrations();
     const canva = list.find((i) => i.id === "canva");
-    expect(canva?.status).toBe("configured_unverified");
-    expect(canva?.notesEn).toContain("no connection is claimed");
+    expect(canva?.status).toBe("blocked");
+    expect(canva?.notesEn).toContain("not wired into this build");
+    expect(canva?.canPublishLive).toBe(false);
   });
 
   it("never treats an AI key as proof that the provider is operational", () => {

@@ -191,13 +191,12 @@ export function evaluateIntegrations(
       id: "canva",
       name: "Canva Integration",
       category: "design",
-      status: "configured_unverified",
+      status: "blocked",
       labelAr: "تكامل Canva",
       labelEn: "Canva",
-      notesAr:
-        "وظيفة OAuth للخادم موجودة، لكن حالة التفويض المحفوظ لا تُقرأ هنا؛ لا ندّعي وجود اتصال.",
+      notesAr: "مسار Canva القديم غير مفعّل في هذا الإصدار؛ لا يوجد اتصال يمكن لهذا الفحص ادعاءه.",
       notesEn:
-        "A server-side OAuth function exists, but this diagnostic does not read saved grants; no connection is claimed.",
+        "The legacy Canva OAuth flow is not wired into this build; no active connection is claimed.",
       canPublishLive: false,
     },
   ];

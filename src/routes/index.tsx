@@ -110,7 +110,7 @@ const T = {
     waDesc:
       "صندوق رسائل العملاء وردود مقترحة من كوتش براين. يتطلب ربط WhatsApp Business API على الرقم 058 821 9130.",
     vaultDesc:
-      "رفع من الهاتف والكمبيوتر وربط Google Drive وPhotos وDropbox وCanva، واختيار محرك الذكاء (OpenAI / Gemini / Runway).",
+      "ارفع الوسائط من جهازك وأدر مكتبتك. ربط الحسابات الخارجية غير متاح في هذا الإصدار.",
     tryBrain: "جرّب كوتش براين الآن لصياغة المحتوى والردود",
     kpiTitle: "المؤشرات",
     demo: "بيانات تجريبية",
@@ -191,7 +191,7 @@ const T = {
     waDesc:
       "Customer inbox with Coach Brain suggested replies. Requires WhatsApp Business API on 058 821 9130.",
     vaultDesc:
-      "Upload from phone/computer, link Google Drive, Photos, Dropbox, Canva, and pick the AI engine (OpenAI / Gemini / Runway).",
+      "Upload media from this device and manage your library. External account integrations are not available in this build.",
     tryBrain: "Use Coach Brain now to draft content and replies",
     kpiTitle: "Indicators",
     demo: "Demo data",
