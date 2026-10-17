@@ -5,110 +5,169 @@ export interface StaffMediaAsset {
   id: string;
   name: string;
   type: "image" | "video";
-  category: "brand" | "pool" | "technique";
-  ratio: "9:16" | "4:5" | "1:1";
+  category: string;
+  ratio: string;
   url: string;
   createdAt: string;
   linkedContentItemIds?: string[];
   isUploaded?: boolean;
 }
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
-const SUPABASE_KEY = (
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  ""
-).trim();
+const MEDIA_BUCKET = "relax-fix-media";
+const SIGNED_URL_SECONDS = 60 * 60;
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
 
-function mapMediaType(typeStr: unknown, name: string): "image" | "video" {
-  const str = String(typeStr || "").toLowerCase();
-  if (str.includes("video") || /\.(mp4|mov|webm)$/i.test(name)) return "video";
-  return "image";
+type JsonRecord = Record<string, unknown>;
+
+function getBackendConfig() {
+  const env = import.meta.env as Record<string, string | undefined>;
+  return {
+    url: (env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, ""),
+    key: (env.VITE_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_ANON_KEY || "").trim(),
+  };
 }
 
-function mapRatio(ratioStr: unknown): "9:16" | "4:5" | "1:1" {
-  const str = String(ratioStr || "").toLowerCase();
-  if (str === "9:16" || str === "vertical") return "9:16";
-  if (str === "4:5" || str === "portrait") return "4:5";
-  return "1:1";
+function asRecord(value: unknown): JsonRecord | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : null;
 }
 
-function mapCategory(catStr: unknown): "brand" | "pool" | "technique" {
-  const str = String(catStr || "").toLowerCase();
-  if (str === "brand") return "brand";
-  if (str === "technique") return "technique";
-  return "pool";
+function stringValue(...values: unknown[]): string {
+  const value = values.find((candidate) => typeof candidate === "string" && candidate.trim());
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function mapMediaType(
+  typeValue: unknown,
+  mimeValue: unknown,
+  name: string,
+): "image" | "video" | null {
+  const type = String(typeValue ?? "").toLowerCase();
+  const mime = String(mimeValue ?? "").toLowerCase();
+  if (type === "video" || mime.startsWith("video/")) return "video";
+  if (type === "image" || mime.startsWith("image/")) return "image";
+  if (/\.(mp4|mov|webm)$/i.test(name)) return "video";
+  if (/\.(png|jpe?g|webp|gif)$/i.test(name)) return "image";
+  return null;
+}
+
+function safeStoragePath(value: unknown, userId: string): string | null {
+  if (typeof value !== "string" || !userId || value.startsWith("/")) return null;
+  const segments = value.split("/");
+  if (
+    segments.length < 2 ||
+    segments[0] !== userId ||
+    segments.some((part) => !part || part === "." || part === "..")
+  ) {
+    return null;
+  }
+  return value;
+}
+
+function storageHeaders(accessToken: string, key: string) {
+  return {
+    apikey: key,
+    Authorization: `Bearer ${accessToken}`,
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+}
+
+async function createSignedMediaUrls(
+  session: OfficialStaffSession,
+  paths: string[],
+): Promise<Map<string, string>> {
+  if (paths.length === 0) return new Map();
+  const { url, key } = getBackendConfig();
+  if (!url || !key) throw new Error("SUPABASE_STORAGE_NOT_CONFIGURED");
+
+  const response = await fetch(`${url}/storage/v1/object/sign/${MEDIA_BUCKET}`, {
+    method: "POST",
+    headers: storageHeaders(session.accessToken, key),
+    body: JSON.stringify({ expiresIn: SIGNED_URL_SECONDS, paths }),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error("MEDIA_SIGNED_URL_FAILED");
+
+  const payload: unknown = await response.json().catch(() => null);
+  if (!Array.isArray(payload)) throw new Error("INVALID_MEDIA_SIGNED_URL_RESPONSE");
+
+  const result = new Map<string, string>();
+  for (const item of payload) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const path = stringValue(row.path);
+    const signed = stringValue(row.signedURL, row.signedUrl);
+    if (!path || !signed) continue;
+    const fullUrl = /^https?:\/\//i.test(signed)
+      ? signed
+      : `${url}/storage/v1${signed.startsWith("/") ? signed : `/${signed}`}`;
+    result.set(path, fullUrl);
+  }
+  return result;
+}
+
+function mapMediaRow(value: unknown, userId: string) {
+  const row = asRecord(value);
+  if (!row) return null;
+  const metadata = asRecord(row.metadata) ?? {};
+  const storagePath = safeStoragePath(row.storagePath ?? row.storage_path, userId);
+  const name =
+    stringValue(
+      metadata.originalName,
+      metadata.fileName,
+      metadata.filename,
+      row.name,
+      storagePath?.split("/").at(-1),
+    ) || "Media Asset";
+  const type = mapMediaType(
+    row.assetType ?? row.asset_type,
+    metadata.mimeType ?? metadata.mime_type,
+    name,
+  );
+  if (!type || typeof row.id !== "string" || !row.id) return null;
+
+  const linkedId = stringValue(row.contentItemId, row.content_item_id);
+  const ratioCandidate = stringValue(metadata.ratio);
+  const ratio = ["9:16", "4:5", "1:1"].includes(ratioCandidate) ? ratioCandidate : "—";
+  return {
+    id: row.id,
+    name,
+    type,
+    category: stringValue(row.category) || "unclassified",
+    ratio,
+    url: "",
+    createdAt: stringValue(row.createdAt, row.created_at) || "",
+    linkedContentItemIds: linkedId ? [linkedId] : [],
+    storagePath,
+  };
 }
 
 export async function getStaffMediaAssets(
   session: OfficialStaffSession,
 ): Promise<StaffMediaAsset[]> {
+  const raw = await callOfficialRpc<unknown>(
+    { accessToken: session.accessToken },
+    "get_staff_media_assets",
+  );
+  if (!Array.isArray(raw)) throw new Error("INVALID_MEDIA_ASSETS_RESPONSE");
+
+  const mapped = raw
+    .map((item) => mapMediaRow(item, session.userId))
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+  const paths = [
+    ...new Set(mapped.flatMap((item) => (item.storagePath ? [item.storagePath] : []))),
+  ];
+  let signedUrls = new Map<string, string>();
   try {
-    const raw = await callOfficialRpc<unknown[]>(
-      { accessToken: session.accessToken },
-      "get_staff_media_assets",
-    );
-    if (Array.isArray(raw)) {
-      return raw.flatMap((item) => {
-        if (!item || typeof item !== "object") return [];
-        const row = item as Record<string, unknown>;
-        const id = String(row["id"] || "");
-        if (!id) return [];
-        const name = String(row["name"] || row["file_name"] || "Media Asset");
-        return [
-          {
-            id,
-            name,
-            type: mapMediaType(row["type"] || row["mime_type"], name),
-            category: mapCategory(row["category"]),
-            ratio: mapRatio(row["ratio"]),
-            url: String(row["url"] || row["public_url"] || ""),
-            createdAt: String(row["created_at"] || new Date().toISOString()),
-            linkedContentItemIds: Array.isArray(row["linked_content_item_ids"])
-              ? row["linked_content_item_ids"].map(String)
-              : [],
-          },
-        ];
-      });
-    }
+    signedUrls = await createSignedMediaUrls(session, paths);
   } catch {
-    // If RPC does not exist yet, fallback to REST table select
+    // Keep the authorized asset metadata visible; do not invent a public URL when signing fails.
   }
 
-  if (SUPABASE_URL && SUPABASE_KEY) {
-    try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/media_assets?select=*&order=created_at.desc`, {
-        headers: {
-          apikey: SUPABASE_KEY,
-          Authorization: `Bearer ${session.accessToken}`,
-          Accept: "application/json",
-        },
-        cache: "no-store",
-      });
-      if (res.ok) {
-        const rows = (await res.json()) as Array<Record<string, unknown>>;
-        if (Array.isArray(rows)) {
-          return rows.map((row) => {
-            const id = String(row["id"] || "");
-            const name = String(row["name"] || row["file_name"] || "Media Asset");
-            return {
-              id,
-              name,
-              type: mapMediaType(row["type"] || row["mime_type"], name),
-              category: mapCategory(row["category"]),
-              ratio: mapRatio(row["ratio"]),
-              url: String(row["url"] || row["public_url"] || ""),
-              createdAt: String(row["created_at"] || new Date().toISOString()),
-            };
-          });
-        }
-      }
-    } catch {
-      // Return empty array
-    }
-  }
-
-  return [];
+  return mapped.map(({ storagePath, ...asset }) => ({
+    ...asset,
+    url: storagePath ? (signedUrls.get(storagePath) ?? "") : "",
+  }));
 }
 
 export async function uploadStaffMediaAsset(
@@ -117,85 +176,70 @@ export async function uploadStaffMediaAsset(
   category: "brand" | "pool" | "technique" = "pool",
   ratio: "9:16" | "4:5" | "1:1" = "4:5",
 ): Promise<StaffMediaAsset> {
-  const ext = file.name.split(".").pop() || "bin";
-  const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const isVideo = file.type.startsWith("video/");
+  const isImage = file.type.startsWith("image/");
+  if (!isVideo && !isImage) throw new Error("UNSUPPORTED_MEDIA_TYPE");
+  if (file.size > MAX_UPLOAD_BYTES) throw new Error("MEDIA_FILE_TOO_LARGE");
+  if (!session.userId) throw new Error("STAFF_USER_ID_REQUIRED");
 
-  let publicUrl = "";
+  const { url, key } = getBackendConfig();
+  if (!url || !key) throw new Error("SUPABASE_STORAGE_NOT_CONFIGURED");
 
-  if (SUPABASE_URL && SUPABASE_KEY) {
-    // Upload object to storage bucket
-    const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/media-assets/${uniqueName}`, {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${session.accessToken}`,
-        "Content-Type": file.type || "application/octet-stream",
-      },
-      body: file,
-    });
+  const extension = (file.name.split(".").pop() ?? "")
+    .replace(/[^a-z0-9]/gi, "")
+    .slice(0, 10)
+    .toLowerCase();
+  const objectName = `${globalThis.crypto.randomUUID()}${extension ? `.${extension}` : ""}`;
+  const storagePath = `${session.userId}/${objectName}`;
+  const encodedPath = storagePath.split("/").map(encodeURIComponent).join("/");
+  const uploadResponse = await fetch(`${url}/storage/v1/object/${MEDIA_BUCKET}/${encodedPath}`, {
+    method: "POST",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${session.accessToken}`,
+      "Content-Type": file.type,
+      "x-upsert": "false",
+    },
+    body: file,
+    cache: "no-store",
+  });
+  if (!uploadResponse.ok) throw new Error("MEDIA_STORAGE_UPLOAD_FAILED");
 
-    if (uploadRes.ok) {
-      publicUrl = `${SUPABASE_URL}/storage/v1/object/public/media-assets/${uniqueName}`;
-    }
-  }
-
-  if (!publicUrl) {
-    publicUrl = URL.createObjectURL(file);
-  }
-
-  // Register in DB via RPC or REST insert
-  let registeredId = `media-${Date.now()}`;
-  try {
-    const regResult = await callOfficialRpc<{ id?: string }>(
+  const registration = asRecord(
+    await callOfficialRpc<unknown>(
       { accessToken: session.accessToken },
       "register_staff_media_upload",
       {
-        p_name: file.name,
-        p_url: publicUrl,
-        p_type: isVideo ? "video" : "image",
-        p_category: category,
-        p_ratio: ratio,
+        p_asset_type: isVideo ? "video" : "image",
+        p_storage_path: storagePath,
+        p_metadata: {
+          originalName: file.name,
+          mimeType: file.type,
+          requestedCategory: category,
+          ratio,
+        },
       },
-    );
-    if (regResult?.id) registeredId = regResult.id;
+    ),
+  );
+  const id = stringValue(registration?.mediaAssetId);
+  if (registration?.success !== true || !id) {
+    throw new Error(stringValue(registration?.code) || "MEDIA_REGISTRATION_FAILED");
+  }
+
+  let signedUrl = "";
+  try {
+    signedUrl = (await createSignedMediaUrls(session, [storagePath])).get(storagePath) ?? "";
   } catch {
-    // Insert fallback via REST
-    if (SUPABASE_URL && SUPABASE_KEY) {
-      try {
-        const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/media_assets`, {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: `Bearer ${session.accessToken}`,
-            "Content-Type": "application/json",
-            Prefer: "return=representation",
-          },
-          body: JSON.stringify({
-            name: file.name,
-            url: publicUrl,
-            type: isVideo ? "video" : "image",
-            category,
-            ratio,
-          }),
-        });
-        if (insertRes.ok) {
-          const inserted = (await insertRes.json()) as Array<{ id?: string }>;
-          if (inserted[0]?.id) registeredId = inserted[0].id;
-        }
-      } catch {
-        // Local representation used
-      }
-    }
+    // The storage object and database registration succeeded; omit only the preview URL.
   }
 
   return {
-    id: registeredId,
+    id,
     name: file.name,
     type: isVideo ? "video" : "image",
-    category,
+    category: "unclassified",
     ratio,
-    url: publicUrl,
+    url: signedUrl,
     createdAt: new Date().toISOString(),
     isUploaded: true,
   };
@@ -206,9 +250,15 @@ export async function linkStaffMediaToContent(
   mediaId: string,
   contentItemId: string,
 ): Promise<{ success: boolean }> {
-  return callOfficialRpc<{ success: boolean }>(
-    { accessToken: session.accessToken },
-    "link_staff_media_to_content_item",
-    { p_media_id: mediaId, p_content_item_id: contentItemId },
+  const result = asRecord(
+    await callOfficialRpc<unknown>(
+      { accessToken: session.accessToken },
+      "link_staff_media_to_content_item",
+      { p_content_item_id: contentItemId, p_media_asset_id: mediaId },
+    ),
   );
+  if (result?.success !== true) {
+    throw new Error(stringValue(result?.code) || "MEDIA_LINK_REJECTED");
+  }
+  return { success: true };
 }

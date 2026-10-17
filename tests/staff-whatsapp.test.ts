@@ -43,22 +43,31 @@ describe("Official WhatsApp Inbox & Staff Controls", () => {
     vi.spyOn(backend, "callOfficialRpc").mockResolvedValueOnce([
       {
         id: "msg-1",
+        conversationId: "conv-1",
         direction: "inbound",
-        text: "السلام عليكم، هل يوجد تقييم مجاني هذا الأسبوع؟",
-        created_at: "2026-10-16T14:01:00Z",
+        authorType: "customer",
+        body: "السلام عليكم، هل يوجد تقييم مجاني هذا الأسبوع؟",
+        createdAt: "2026-10-16T14:01:00Z",
       },
       {
         id: "msg-2",
+        conversationId: "conv-1",
         direction: "outbound",
-        text: "أهلاً بك! نعم، التقييم الأولي مجاني تماماً بإشراف كابتن أيمن.",
-        created_at: "2026-10-16T14:02:00Z",
+        authorType: "staff",
+        body: "أهلاً بك! نعم، التقييم الأولي مجاني تماماً بإشراف كابتن أيمن.",
+        createdAt: "2026-10-16T14:02:00Z",
       },
     ]);
 
     const messages = await getStaffConversationMessages(session, "conv-1");
     expect(messages).toHaveLength(2);
     expect(messages[0]?.direction).toBe("inbound");
+    expect(messages[0]?.text).toBe("السلام عليكم، هل يوجد تقييم مجاني هذا الأسبوع؟");
+    expect(messages[0]?.timestamp).toBe(Date.parse("2026-10-16T14:01:00Z"));
+    expect(messages[0]?.senderName).toBe("Client");
     expect(messages[1]?.direction).toBe("outbound");
+    expect(messages[1]?.text).toBe("أهلاً بك! نعم، التقييم الأولي مجاني تماماً بإشراف كابتن أيمن.");
+    expect(messages[1]?.senderName).toBe("Staff");
   });
 
   it("handles human takeover with take_over_staff_conversation RPC", async () => {
@@ -95,5 +104,15 @@ describe("Official WhatsApp Inbox & Staff Controls", () => {
     const res = await sendStaffWhatsAppMessage(session, "conv-1", "Test response");
     expect(res.dryRun).toBe(true);
     expect(res.code).toBe("DRY_RUN_ONLY_ACTIVE");
+  });
+
+  it("does not report a failed database mode transition as successful", async () => {
+    vi.spyOn(backend, "callOfficialRpc").mockResolvedValueOnce({
+      success: false,
+      code: "NOT_FOUND",
+    });
+    await expect(takeOverStaffConversation(session, "missing-conversation")).rejects.toThrow(
+      "NOT_FOUND",
+    );
   });
 });

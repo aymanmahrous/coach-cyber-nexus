@@ -32,16 +32,18 @@ export function MediaVault({ lang, log, session }: MediaVaultProps) {
   const isAr = lang === "ar";
   const [assets, setAssets] = useState<StaffMediaAsset[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function loadMedia() {
     setLoading(true);
+    setLoadError(false);
     try {
       const items = await getStaffMediaAssets(session);
       setAssets(items);
     } catch {
-      setAssets([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -243,6 +245,17 @@ export function MediaVault({ lang, log, session }: MediaVaultProps) {
           </p>
         )}
 
+        {loadError && (
+          <p
+            role="alert"
+            className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-center text-xs text-destructive"
+          >
+            {isAr
+              ? "تعذر تحميل الوسائط من خدمة Supabase؛ لم يتم اعتبارها قائمة فارغة."
+              : "Media could not be loaded from Supabase; this is not an empty-library result."}
+          </p>
+        )}
+
         {!loading && (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {assets.map((asset) => (
@@ -287,7 +300,7 @@ export function MediaVault({ lang, log, session }: MediaVaultProps) {
               </div>
             ))}
 
-            {assets.length === 0 && (
+            {assets.length === 0 && !loadError && (
               <div className="col-span-full rounded-lg border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
                 {isAr
                   ? "لا توجد وسائط مخزنة بعد. اضغط على 'رفع وسائط جديدة' لرفع صور أو فيديوهات للسباحة."

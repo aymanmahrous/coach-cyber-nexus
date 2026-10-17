@@ -1,4 +1,4 @@
-import { callOfficialRpc, callOfficialFunction } from "./official-backend";
+import { callOfficialRpc } from "./official-backend";
 import type { OfficialStaffSession } from "./official-auth";
 
 export interface StaffInboxMessage {
@@ -26,105 +26,135 @@ export interface StaffConversationMessage {
 
 const ALLOWED_SEND_ROLES = new Set(["super_admin", "admin", "reception", "coach"]);
 
+type JsonRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): JsonRecord | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : null;
+}
+
 function mapPlatform(raw: unknown): StaffInboxMessage["platform"] {
   const str = String(raw || "").toLowerCase();
   if (str === "whatsapp" || str === "messenger" || str === "instagram") return str;
   return "unknown";
 }
 
-export async function getStaffInbox(session: OfficialStaffSession): Promise<StaffInboxMessage[]> {
-  try {
-    const raw = await callOfficialRpc<unknown[]>({ accessToken: session.accessToken }, "get_staff_inbox");
-    if (!Array.isArray(raw)) return [];
-    return raw.flatMap((item) => {
-      if (!item || typeof item !== "object") return [];
-      const row = item as Record<string, unknown>;
-      const id = String(row["id"] || row["conversation_id"] || "");
-      if (!id) return [];
-      const updated = Date.parse(String(row["updatedAt"] || row["updated_at"] || ""));
-      return [
-        {
-          id,
-          conversationId: id,
-          platform: mapPlatform(row["channel"] || row["platform"]),
-          senderId: String(row["leadId"] || row["lead_id"] || id),
-          senderName: String(row["leadName"] || row["lead_name"] || row["client_name"] || "Client"),
-          text: String(row["lastMessage"] || row["last_message"] || ""),
-          timestamp: Number.isFinite(updated) ? updated : Date.now(),
-          mode: String(row["mode"] || "ai_active"),
-          unread: Number(row["unread"] || 0),
-          needsAttention: Boolean(row["needsAttention"] || row["needs_attention"]),
-        },
-      ];
-    });
-  } catch (error) {
-    // If the backend has no conversations yet or RPC returns empty, return empty list
-    return [];
+function messageTime(...values: unknown[]): number {
+  const raw = values.find((value) => typeof value === "string" && value);
+  const timestamp = typeof raw === "string" ? Date.parse(raw) : Number.NaN;
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function requireRpcSuccess(
+  result: unknown,
+  fallbackCode: string,
+): { success?: boolean; mode?: string; code?: string } {
+  const row = asRecord(result);
+  if (row?.success !== true) {
+    const code = typeof row?.code === "string" ? row.code : fallbackCode;
+    throw new Error(code);
   }
+  return row as { success?: boolean; mode?: string; code?: string };
+}
+
+export async function getStaffInbox(session: OfficialStaffSession): Promise<StaffInboxMessage[]> {
+  const raw = await callOfficialRpc<unknown[]>(
+    { accessToken: session.accessToken },
+    "get_staff_inbox",
+  );
+  if (!Array.isArray(raw)) throw new Error("INVALID_STAFF_INBOX_RESPONSE");
+  return raw.flatMap((item) => {
+    const row = asRecord(item);
+    if (!row) return [];
+    const id = String(row.id || "");
+    if (!id) return [];
+    return [
+      {
+        id,
+        conversationId: id,
+        platform: mapPlatform(row.channel),
+        senderId: String(row.leadId || ""),
+        senderName: String(row.leadName || "Client"),
+        text: String(row.lastMessage || ""),
+        timestamp: messageTime(row.updatedAt),
+        mode: String(row.mode || "ai_active"),
+        unread: Number(row.unread || 0),
+        needsAttention: Boolean(row.needsAttention),
+      },
+    ];
+  });
 }
 
 export async function getStaffConversationMessages(
   session: OfficialStaffSession,
   conversationId: string,
 ): Promise<StaffConversationMessage[]> {
-  try {
-    const raw = await callOfficialRpc<unknown[]>(
-      { accessToken: session.accessToken },
-      "get_staff_conversation_messages",
-      { p_conversation_id: conversationId },
-    );
-    if (!Array.isArray(raw)) return [];
-    return raw.flatMap((item) => {
-      if (!item || typeof item !== "object") return [];
-      const row = item as Record<string, unknown>;
-      const id = String(row["id"] || "");
-      if (!id) return [];
-      const ts = Date.parse(String(row["created_at"] || row["timestamp"] || ""));
-      return [
-        {
-          id,
-          conversationId,
-          direction: String(row["direction"] || "inbound") === "outbound" ? "outbound" : "inbound",
-          text: String(row["text"] || row["message"] || ""),
-          senderName: String(row["sender_name"] || (row["direction"] === "outbound" ? "Staff" : "Client")),
-          timestamp: Number.isFinite(ts) ? ts : Date.now(),
-          status: typeof row["status"] === "string" ? row["status"] : undefined,
-        },
-      ];
-    });
-  } catch {
-    return [];
-  }
+  const raw = await callOfficialRpc<unknown[]>(
+    { accessToken: session.accessToken },
+    "get_staff_conversation_messages",
+    { p_conversation_id: conversationId },
+  );
+  if (!Array.isArray(raw)) throw new Error("INVALID_CONVERSATION_MESSAGES_RESPONSE");
+  return raw.flatMap((item) => {
+    const row = asRecord(item);
+    const id = typeof row?.id === "string" ? row.id : "";
+    if (!row || !id) return [];
+    const direction = row.direction === "outbound" ? "outbound" : "inbound";
+    const authorType = String(row.authorType || "").toLowerCase();
+    const senderName =
+      authorType === "staff" || authorType === "human"
+        ? "Staff"
+        : authorType === "ai" || authorType === "ai_draft"
+          ? "AI"
+          : direction === "outbound"
+            ? "Staff"
+            : "Client";
+    return [
+      {
+        id,
+        conversationId: String(row.conversationId || conversationId),
+        direction,
+        text: String(row.body || ""),
+        senderName,
+        timestamp: messageTime(row.createdAt),
+      },
+    ];
+  });
 }
 
 export async function takeOverStaffConversation(
   session: OfficialStaffSession,
   conversationId: string,
 ): Promise<{ success: boolean; mode?: string }> {
-  const result = await callOfficialRpc<{ success?: boolean; mode?: string }>(
-    { accessToken: session.accessToken },
-    "take_over_staff_conversation",
-    { p_conversation_id: conversationId },
+  const result = requireRpcSuccess(
+    await callOfficialRpc<unknown>(
+      { accessToken: session.accessToken },
+      "take_over_staff_conversation",
+      { p_conversation_id: conversationId },
+    ),
+    "CONVERSATION_TAKEOVER_REJECTED",
   );
-  return { success: result?.success !== false, mode: result?.mode || "human_takeover" };
+  return { success: true, mode: result.mode || "human_takeover" };
 }
 
 export async function returnStaffConversationToAi(
   session: OfficialStaffSession,
   conversationId: string,
 ): Promise<{ success: boolean; mode?: string }> {
-  const result = await callOfficialRpc<{ success?: boolean; mode?: string }>(
-    { accessToken: session.accessToken },
-    "return_staff_conversation_to_ai",
-    { p_conversation_id: conversationId },
+  const result = requireRpcSuccess(
+    await callOfficialRpc<unknown>(
+      { accessToken: session.accessToken },
+      "return_staff_conversation_to_ai",
+      { p_conversation_id: conversationId },
+    ),
+    "CONVERSATION_RETURN_REJECTED",
   );
-  return { success: result?.success !== false, mode: result?.mode || "ai_active" };
+  return { success: true, mode: result.mode || "ai_active" };
 }
 
 export async function sendStaffWhatsAppMessage(
   session: OfficialStaffSession,
-  conversationId: string,
-  body: string,
+  _conversationId: string,
+  _body: string,
 ): Promise<{ success: boolean; dryRun: boolean; code?: string }> {
   if (!ALLOWED_SEND_ROLES.has(session.role)) {
     throw new Error("STAFF_SEND_FORBIDDEN");

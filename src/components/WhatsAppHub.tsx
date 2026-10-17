@@ -71,9 +71,11 @@ export function WhatsAppHub({ lang, log, session }: WhatsAppHubProps) {
   const isAr = lang === "ar";
   const [inbox, setInbox] = useState<StaffInboxMessage[]>([]);
   const [loadingInbox, setLoadingInbox] = useState(false);
+  const [inboxError, setInboxError] = useState(false);
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [convMessages, setConvMessages] = useState<StaffConversationMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [messagesError, setMessagesError] = useState(false);
   const [mutatingMode, setMutatingMode] = useState(false);
 
   const [selectedTemplate, setSelectedTemplate] = useState(TEMPLATES[0]!.id);
@@ -96,6 +98,7 @@ export function WhatsAppHub({ lang, log, session }: WhatsAppHubProps) {
 
   async function loadInboxData() {
     setLoadingInbox(true);
+    setInboxError(false);
     try {
       const items = await getStaffInbox(session);
       setInbox(items);
@@ -103,7 +106,7 @@ export function WhatsAppHub({ lang, log, session }: WhatsAppHubProps) {
         setSelectedConvId(items[0]!.conversationId);
       }
     } catch {
-      setInbox([]);
+      setInboxError(true);
     } finally {
       setLoadingInbox(false);
     }
@@ -116,9 +119,11 @@ export function WhatsAppHub({ lang, log, session }: WhatsAppHubProps) {
   useEffect(() => {
     if (!selectedConvId) return;
     setLoadingMessages(true);
+    setMessagesError(false);
+    setConvMessages([]);
     getStaffConversationMessages(session, selectedConvId)
       .then(setConvMessages)
-      .catch(() => setConvMessages([]))
+      .catch(() => setMessagesError(true))
       .finally(() => setLoadingMessages(false));
   }, [selectedConvId, session.accessToken]);
 
@@ -146,7 +151,7 @@ export function WhatsAppHub({ lang, log, session }: WhatsAppHubProps) {
       setInbox((prev) =>
         prev.map((c) => (c.conversationId === convId ? { ...c, mode: "ai_active" } : c)),
       );
-      log(isAr ? "تمت إعادة المحادثة للذكاء الاصطناعي" : "Returned conversation to AI", "ok");
+      log(isAr ? "تم تغيير وضع المحادثة إلى الذكاء الاصطناعي" : "Conversation set to AI mode", "ok");
     } catch (e) {
       log(`${isAr ? "تعذر الإرجاع" : "Return failed"}: ${(e as Error).message}`, "err");
     } finally {
@@ -245,16 +250,18 @@ ${channelContext}
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-display text-sm tracking-wider text-primary">
-                  {isAr ? "مركز رسائل العملاء ومسار الاستقبال (n8n & Supabase)" : "Official Staff Inbox & Ingress"}
+                  {isAr
+                    ? "صندوق محادثات الموظفين وأدوات التحكم"
+                    : "Staff Inbox & Conversation Controls"}
                 </h2>
-                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 font-mono text-[11px] text-emerald-400 font-bold">
-                  {isAr ? "مسار n8n معتمد" : "Authoritative n8n Ingress"}
+                <span className="rounded-full bg-secondary px-2 py-0.5 font-mono text-[11px] text-muted-foreground font-bold">
+                  {isAr ? "الاستقبال غير مفحوص" : "Ingress Unverified"}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
                 {isAr
-                  ? "يستقبل مسار n8n رسائل Meta ويخزنها في Supabase. يمكنك مراقبة المحادثات والاستحواذ البشري وإعادتها للذكاء الاصطناعي."
-                  : "Meta messages arrive via authoritative n8n pipeline and store in Supabase. Staff can monitor, take over, or return to AI."}
+                  ? "تعرض الشاشة نتائج استدعاءات قاعدة البيانات؛ لا تتحقق من استقبال n8n. الإرسال الخارجي معطل، وتغيير وضع المحادثة لا يُعتمد إلا بعد نجاح قاعدة البيانات."
+                  : "This screen displays database RPC results; it does not verify n8n ingress. External sending is disabled, and conversation-mode changes are accepted only after database success."}
               </p>
             </div>
           </div>
@@ -278,10 +285,10 @@ ${channelContext}
         <div className="grid gap-3 sm:grid-cols-4 pt-1">
           <div className="rounded-lg border border-border bg-background/50 p-2.5">
             <span className="text-[11px] text-muted-foreground">
-              {isAr ? "مسار الاستقبال المعتمد:" : "Authoritative Ingress:"}
+              {isAr ? "حالة الاستقبال:" : "Ingress status:"}
             </span>
-            <div className="text-sm font-bold text-emerald-400 mt-0.5">
-              n8n & Supabase
+            <div className="text-sm font-bold text-muted-foreground mt-0.5">
+              {isAr ? "غير مفحوص" : "Not checked"}
             </div>
           </div>
           <div className="rounded-lg border border-border bg-background/50 p-2.5">
@@ -323,6 +330,21 @@ ${channelContext}
           </div>
 
           <div className="space-y-2 max-h-96 overflow-y-auto">
+            {loadingInbox && (
+              <p className="rounded-lg border border-border p-4 text-center text-xs text-muted-foreground">
+                {isAr ? "جارٍ تحميل المحادثات…" : "Loading conversations…"}
+              </p>
+            )}
+            {inboxError && (
+              <p
+                role="alert"
+                className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-center text-xs text-destructive"
+              >
+                {isAr
+                  ? "تعذر قراءة المحادثات من قاعدة البيانات."
+                  : "Could not read conversations from the database."}
+              </p>
+            )}
             {inbox.map((conv) => {
               const selected = conv.conversationId === selectedConvId;
               return (
@@ -349,8 +371,8 @@ ${channelContext}
                           ? "استحواذ بشري"
                           : "Staff Takeover"
                         : isAr
-                          ? "ذكاء اصطناعي"
-                          : "AI Active"}
+                          ? "وضع الذكاء الاصطناعي"
+                          : "AI Mode"}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground truncate">{conv.text}</p>
@@ -358,11 +380,11 @@ ${channelContext}
               );
             })}
 
-            {inbox.length === 0 && (
+            {inbox.length === 0 && !loadingInbox && !inboxError && (
               <p className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
                 {isAr
-                  ? "لا توجد محادثات واردة حالياً في قاعدة البيانات. المحادثات تظهر تلقائياً عند وصول رسائل عبر n8n."
-                  : "No conversations recorded yet. Inbound messages from n8n will appear here automatically."}
+                  ? "لم تُرجع قاعدة البيانات أي محادثات لموظفك."
+                  : "The database returned no conversations for this staff session."}
               </p>
             )}
           </div>
@@ -383,7 +405,7 @@ ${channelContext}
                     className="flex items-center gap-1 rounded bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
                   >
                     <Bot className="size-3.5" />
-                    {isAr ? "إرجاع للذكاء الاصطناعي" : "Return to AI"}
+                    {isAr ? "تغيير الوضع إلى الذكاء الاصطناعي" : "Set AI mode"}
                   </button>
                 ) : (
                   <button
@@ -405,24 +427,36 @@ ${channelContext}
                 {isAr ? "جارٍ تحميل الرسائل…" : "Loading messages…"}
               </p>
             )}
-            {!loadingMessages && convMessages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`max-w-[85%] rounded-lg p-2.5 text-xs ${
-                  msg.direction === "outbound"
-                    ? "ms-auto bg-primary text-primary-foreground"
-                    : "me-auto bg-secondary text-foreground"
-                }`}
-              >
-                <div className="text-[10px] opacity-75 mb-0.5">{msg.senderName}</div>
-                <div>{msg.text}</div>
-              </div>
-            ))}
-            {!loadingMessages && convMessages.length === 0 && (
-              <p className="text-center text-xs text-muted-foreground py-8">
+            {messagesError && (
+              <p role="alert" className="text-center text-xs text-destructive py-8">
                 {isAr
-                  ? "حدد محادثة من القائمة لعرض سجل الرسائل."
-                  : "Select a conversation to view message history."}
+                  ? "تعذر تحميل سجل الرسائل من قاعدة البيانات."
+                  : "Could not load message history from the database."}
+              </p>
+            )}
+            {!loadingMessages &&
+              convMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`max-w-[85%] rounded-lg p-2.5 text-xs ${
+                    msg.direction === "outbound"
+                      ? "ms-auto bg-primary text-primary-foreground"
+                      : "me-auto bg-secondary text-foreground"
+                  }`}
+                >
+                  <div className="text-[10px] opacity-75 mb-0.5">{msg.senderName}</div>
+                  <div>{msg.text}</div>
+                </div>
+              ))}
+            {!loadingMessages && !messagesError && convMessages.length === 0 && (
+              <p className="text-center text-xs text-muted-foreground py-8">
+                {selectedConvId
+                  ? isAr
+                    ? "لا توجد رسائل في المحادثة المحددة."
+                    : "No messages were returned for this conversation."
+                  : isAr
+                    ? "حدد محادثة من القائمة لعرض سجل الرسائل."
+                    : "Select a conversation to view message history."}
               </p>
             )}
           </div>

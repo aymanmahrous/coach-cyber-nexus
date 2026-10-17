@@ -15,11 +15,7 @@ const AuthUserSchema = z.object({ id: z.string().uuid() });
 const StaffProfileSchema = z.object({ role: z.string(), active: z.boolean() });
 
 export type IntegrationStatusType =
-  | "not_configured"
-  | "setup_saved"
-  | "configured_unverified"
-  | "verified"
-  | "blocked";
+  "not_configured" | "setup_saved" | "configured_unverified" | "verified" | "blocked";
 
 export interface IntegrationSummary {
   id: string;
@@ -33,7 +29,9 @@ export interface IntegrationSummary {
   canPublishLive: boolean;
 }
 
-async function requireStaffSession(request: Request): Promise<{ accessToken: string } | { status: number; message: string }> {
+async function requireStaffSession(
+  request: Request,
+): Promise<{ accessToken: string } | { status: number; message: string }> {
   const authorization = request.headers.get("authorization") || "";
   const accessToken = authorization.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
   if (!SUPABASE_URL || !SUPABASE_KEY || !STAFF_TABLE || !accessToken) {
@@ -82,60 +80,83 @@ async function requireStaffSession(request: Request): Promise<{ accessToken: str
   return { accessToken };
 }
 
-export function evaluateIntegrations(): IntegrationSummary[] {
+export function evaluateIntegrations(
+  options: { staffBackendVerified?: boolean } = {},
+): IntegrationSummary[] {
   const hasMetaPageId = Boolean(process.env["FACEBOOK_PAGE_ID"]);
   const hasMetaPageToken = Boolean(process.env["FACEBOOK_PAGE_ACCESS_TOKEN"]);
   const hasInstagramId = Boolean(process.env["INSTAGRAM_ACCOUNT_ID"]);
   const hasInstagramToken = Boolean(process.env["INSTAGRAM_ACCESS_TOKEN"]);
-  const hasWhatsAppToken = Boolean(process.env["WHATSAPP_API_TOKEN"] || process.env["META_WHATSAPP_TOKEN"]);
+  const hasWhatsAppToken = Boolean(
+    process.env["WHATSAPP_API_TOKEN"] || process.env["META_WHATSAPP_TOKEN"],
+  );
   const hasAiProvider = Boolean(
     process.env["GEMINI_API_KEY"] ||
     process.env["GOOGLE_API_KEY"] ||
     process.env["OPENAI_API_KEY"] ||
-    process.env["LOVABLE_API_KEY"]
+    process.env["LOVABLE_API_KEY"],
   );
 
   return [
     {
       id: "supabase",
-      name: "Supabase Backend & Storage",
+      name: "Supabase Staff Auth & Database",
       category: "backend",
-      status: SUPABASE_URL && SUPABASE_KEY ? "verified" : "not_configured",
-      labelAr: "قاعدة البيانات والتخزين",
-      labelEn: "Database & Storage",
-      notesAr: "جلسة الموظفين وقواعد البيانات متصلة ومحمية برمز الوصول الرسمي.",
-      notesEn: "Staff session and databases connected and verified via bearer JWT.",
+      status: options.staffBackendVerified
+        ? "verified"
+        : SUPABASE_URL && SUPABASE_KEY
+          ? "configured_unverified"
+          : "not_configured",
+      labelAr: "مصادقة الموظفين وقاعدة البيانات",
+      labelEn: "Staff Auth & Database",
+      notesAr: options.staffBackendVerified
+        ? "تم التحقق من جلسة الموظف وملف الصلاحية في هذا الطلب؛ لم يُختبر التخزين."
+        : "الإعداد موجود؛ لم يثبت هذا الفحص اتصال قاعدة البيانات أو التخزين.",
+      notesEn: options.staffBackendVerified
+        ? "Staff JWT and role-profile read succeeded for this request; Storage was not tested."
+        : "Configuration is present; this diagnostic has not verified database or Storage access.",
       canPublishLive: false,
     },
     {
       id: "coach_brain",
       name: "Coach Brain AI Engine",
       category: "ai",
-      status: hasAiProvider ? "verified" : "not_configured",
+      status: hasAiProvider ? "configured_unverified" : "not_configured",
       labelAr: "محرك كوتش براين",
       labelEn: "Coach Brain AI",
       notesAr: hasAiProvider
-        ? "مزود الذكاء الاصطناعي متصل وجاهز للرد على استفسارات التدريب والمحتوى."
+        ? "مفتاح مزود الذكاء الاصطناعي موجود؛ لم يُختبر الاتصال أو إنشاء إجابة في هذا الفحص."
         : "لا يوجد مفتاح مزود ذكاء اصطناعي مهيأ.",
-      notesEn: hasAiProvider ? "AI provider configured and operational." : "No AI provider configured.",
+      notesEn: hasAiProvider
+        ? "An AI-provider key is configured; this diagnostic does not test connectivity or generation."
+        : "No AI provider configured.",
       canPublishLive: false,
     },
     {
       id: "whatsapp",
       name: "WhatsApp Business (058 821 9130)",
       category: "messaging",
-      status: hasWhatsAppToken ? "configured_unverified" : "setup_saved",
+      status: hasWhatsAppToken ? "configured_unverified" : "not_configured",
       labelAr: "واتساب للأعمال",
       labelEn: "WhatsApp Business",
-      notesAr: "مسار الاستقبال المعتمد عبر n8n وقاعدة البيانات؛ الإرسال المباشر محمي بـ dry-run.",
-      notesEn: "Inbound ingress authoritative via n8n & Supabase; outbound sending dry-run only.",
+      notesAr: hasWhatsAppToken
+        ? "الإعداد موجود دون اختبار اتصال؛ لا يفحص هذا المسار استقبال n8n، والإرسال الخارجي معطل (dry-run)."
+        : "لم يُتحقق هنا من استقبال الرسائل؛ لا يوجد إعداد إرسال مباشر، والإرسال الخارجي معطل (dry-run).",
+      notesEn: hasWhatsAppToken
+        ? "Configuration is present but untested; n8n ingress is not checked and outbound sending remains dry-run."
+        : "Ingress is not checked here; no outbound configuration is present and sending remains dry-run.",
       canPublishLive: false,
     },
     {
       id: "facebook",
       name: "Facebook Page (Captain Ayman)",
       category: "social",
-      status: hasMetaPageId && hasMetaPageToken ? "configured_unverified" : hasMetaPageId ? "setup_saved" : "not_configured",
+      status:
+        hasMetaPageId && hasMetaPageToken
+          ? "configured_unverified"
+          : hasMetaPageId
+            ? "setup_saved"
+            : "not_configured",
       labelAr: "صفحة فيسبوك",
       labelEn: "Facebook Page",
       notesAr: hasMetaPageId
@@ -150,7 +171,12 @@ export function evaluateIntegrations(): IntegrationSummary[] {
       id: "instagram",
       name: "Instagram Professional (@RelaxFixUAE)",
       category: "social",
-      status: hasInstagramId && hasInstagramToken ? "configured_unverified" : hasInstagramId ? "setup_saved" : "not_configured",
+      status:
+        hasInstagramId && hasInstagramToken
+          ? "configured_unverified"
+          : hasInstagramId
+            ? "setup_saved"
+            : "not_configured",
       labelAr: "إنستغرام الاحترافي",
       labelEn: "Instagram Account",
       notesAr: hasInstagramId
@@ -165,11 +191,13 @@ export function evaluateIntegrations(): IntegrationSummary[] {
       id: "canva",
       name: "Canva Integration",
       category: "design",
-      status: "not_configured",
+      status: "configured_unverified",
       labelAr: "تكامل Canva",
       labelEn: "Canva",
-      notesAr: "المسار القديم ذو التوكن المؤقت في الذاكرة أُحيل للتقاعد؛ يتطلب تفويضاً رسمياً دائماً.",
-      notesEn: "Legacy route retired; durable OAuth integration pending.",
+      notesAr:
+        "وظيفة OAuth للخادم موجودة، لكن حالة التفويض المحفوظ لا تُقرأ هنا؛ لا ندّعي وجود اتصال.",
+      notesEn:
+        "A server-side OAuth function exists, but this diagnostic does not read saved grants; no connection is claimed.",
       canPublishLive: false,
     },
   ];
@@ -187,7 +215,9 @@ export const Route = createFileRoute("/api/integrations")({
           });
         }
 
-        const integrations = evaluateIntegrations();
+        // The deployed get_staff_integrations RPC seeds rows on read, so this
+        // read-only diagnostics route deliberately does not call it.
+        const integrations = evaluateIntegrations({ staffBackendVerified: true });
         return new Response(JSON.stringify({ integrations }), {
           status: 200,
           headers: {
