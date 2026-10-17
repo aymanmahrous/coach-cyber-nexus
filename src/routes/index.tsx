@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import { ContentFactory } from "@/components/ContentFactory";
+import { SettingsModal } from "@/components/SettingsModal";
 import { WhatsAppHub } from "@/components/WhatsAppHub";
 import { MediaVault } from "@/components/MediaVault";
 import { usePosts } from "@/lib/posts";
@@ -27,6 +28,7 @@ import {
   Send,
   Square,
   Trash2,
+  Settings,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -420,6 +422,7 @@ function CockpitShell({
   const [tab, setTab] = useState<Tab>("cockpit");
   const [notes, setNotes] = useState<Note[]>([]);
   const [brainState, setBrainState] = useState<"ready" | "online" | "err">("ready");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const t = T[lang];
   const isAr = lang === "ar";
 
@@ -498,6 +501,13 @@ function CockpitShell({
           </span>
           <button
             type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-muted-foreground hover:text-foreground"
+          >
+            <Settings className="size-3.5" /> {isAr ? "الإعدادات" : "Settings"}
+          </button>
+          <button
+            type="button"
             onClick={onSignOut}
             className="rounded-full border border-border px-2.5 py-1 text-muted-foreground hover:text-foreground"
           >
@@ -543,8 +553,9 @@ function CockpitShell({
         </div>
         {tab === "factory" && <ContentFactory lang={lang} log={log} session={session} />}
         {tab === "whatsapp" && <WhatsAppHub lang={lang} log={log} session={session} />}
-        {tab === "vault" && <MediaVault lang={lang} log={log} />}
+        {tab === "vault" && <MediaVault lang={lang} log={log} session={session} />}
       </main>
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} lang={lang} session={session} />
     </div>
   );
 }

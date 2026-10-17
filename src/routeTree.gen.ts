@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiBrainRouteImport } from './routes/api/brain'
+import { Route as ApiIntegrationsRouteImport } from './routes/api/integrations'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const ApiBrainRoute = ApiBrainRouteImport.update({
   path: '/api/brain',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiIntegrationsRoute = ApiIntegrationsRouteImport.update({
+  id: '/api/integrations',
+  path: '/api/integrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/brain': typeof ApiBrainRoute
+  '/api/integrations': typeof ApiIntegrationsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/brain': typeof ApiBrainRoute
+  '/api/integrations': typeof ApiIntegrationsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/brain': typeof ApiBrainRoute
+  '/api/integrations': typeof ApiIntegrationsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/brain'
+  fullPaths: '/' | '/api/brain' | '/api/integrations'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/brain'
-  id: '__root__' | '/' | '/api/brain'
+  to: '/' | '/api/brain' | '/api/integrations'
+  id: '__root__' | '/' | '/api/brain' | '/api/integrations'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiBrainRoute: typeof ApiBrainRoute
+  ApiIntegrationsRoute: typeof ApiIntegrationsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBrainRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/integrations': {
+      id: '/api/integrations'
+      path: '/api/integrations'
+      fullPath: '/api/integrations'
+      preLoaderRoute: typeof ApiIntegrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiBrainRoute: ApiBrainRoute,
+  ApiIntegrationsRoute: ApiIntegrationsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
