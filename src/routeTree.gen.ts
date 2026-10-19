@@ -11,8 +11,6 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiBrainRouteImport } from './routes/api/brain'
-import { Route as ApiCanvaRouteImport } from './routes/api/canva'
-import { Route as ApiPublishRouteImport } from './routes/api/publish'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -24,49 +22,31 @@ const ApiBrainRoute = ApiBrainRouteImport.update({
   path: '/api/brain',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiCanvaRoute = ApiCanvaRouteImport.update({
-  id: '/api/canva',
-  path: '/api/canva',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublishRoute = ApiPublishRouteImport.update({
-  id: '/api/publish',
-  path: '/api/publish',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/brain': typeof ApiBrainRoute
-  '/api/canva': typeof ApiCanvaRoute
-  '/api/publish': typeof ApiPublishRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/brain': typeof ApiBrainRoute
-  '/api/canva': typeof ApiCanvaRoute
-  '/api/publish': typeof ApiPublishRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/brain': typeof ApiBrainRoute
-  '/api/canva': typeof ApiCanvaRoute
-  '/api/publish': typeof ApiPublishRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/brain' | '/api/canva' | '/api/publish'
+  fullPaths: '/' | '/api/brain'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/brain' | '/api/canva' | '/api/publish'
-  id: '__root__' | '/' | '/api/brain' | '/api/canva' | '/api/publish'
+  to: '/' | '/api/brain'
+  id: '__root__' | '/' | '/api/brain'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiBrainRoute: typeof ApiBrainRoute
-  ApiCanvaRoute: typeof ApiCanvaRoute
-  ApiPublishRoute: typeof ApiPublishRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -85,28 +65,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBrainRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/canva': {
-      id: '/api/canva'
-      path: '/api/canva'
-      fullPath: '/api/canva'
-      preLoaderRoute: typeof ApiCanvaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/publish': {
-      id: '/api/publish'
-      path: '/api/publish'
-      fullPath: '/api/publish'
-      preLoaderRoute: typeof ApiPublishRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiBrainRoute: ApiBrainRoute,
-  ApiCanvaRoute: ApiCanvaRoute,
-  ApiPublishRoute: ApiPublishRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

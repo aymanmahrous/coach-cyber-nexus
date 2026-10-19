@@ -1,16 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { canvaStatus } from "@/lib/integration-guards";
-import {
-  ExternalLink,
-  FolderOpen,
-  Image,
-  Sparkles,
-  Upload,
-  Video,
-  Check,
-  Copy,
-  ShieldCheck,
-} from "lucide-react";
+import { ExternalLink, FolderOpen, Image, Sparkles, Upload, Video } from "lucide-react";
 
 type Lang = "ar" | "en";
 
@@ -64,48 +53,8 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
   const isAr = lang === "ar";
   const [assets, setAssets] = useState<MediaAsset[]>(DEFAULT_ASSETS);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [canvaStatusError, setCanvaStatusError] = useState(false);
-  const [canvaConfig, setCanvaConfig] = useState<{
-    configured: boolean;
-    brandTemplateId: string;
-    connected: boolean;
-  }>({
-    configured: false,
-    brandTemplateId: "",
-    connected: false,
-  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef<string[]>([]);
-
-  const canvaBrandTemplateId = canvaConfig.brandTemplateId;
-
-  useEffect(() => {
-    let active = true;
-    fetch("/api/canva")
-      .then((r) => {
-        if (!r.ok) throw new Error(`Canva status request failed (${r.status})`);
-        return r.json();
-      })
-      .then((data) => {
-        if (data && typeof data.configured === "boolean") {
-          if (active)
-            setCanvaConfig({
-              configured: data.configured,
-              brandTemplateId: typeof data.brandTemplateId === "string" ? data.brandTemplateId : "",
-              // Token lives only in one server instance's memory: limited, not verified.
-              connected: canvaStatus(data) === "limited",
-            });
-        } else if (active) {
-          setCanvaStatusError(true);
-        }
-      })
-      .catch(() => {
-        if (active) setCanvaStatusError(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(
     () => () => {
@@ -162,27 +111,6 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
     e.target.value = "";
   };
 
-  const copyTemplateId = (id: string) => {
-    navigator.clipboard.writeText(id);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 1500);
-    log(isAr ? "تم نسخ معرف قالب Canva" : "Canva template ID copied", "ok");
-  };
-
-  const startCanvaAuth = () => {
-    if (!canvaConfig.configured) {
-      log(
-        isAr
-          ? "أضف CANVA_CLIENT_ID وCANVA_CLIENT_SECRET إلى أسرار الخادم أولاً."
-          : "Set CANVA_CLIENT_ID and CANVA_CLIENT_SECRET as server secrets first.",
-        "err",
-      );
-      return;
-    }
-    window.open("/api/canva?action=auth", "_blank", "noopener");
-    log(isAr ? "فتح صفحة تفويض Canva…" : "Opening Canva OAuth…", "info");
-  };
-
   return (
     <div className="space-y-4">
       {/* Header and Integration Banner */}
@@ -221,87 +149,7 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
 
         {/* Studio Cards Grid */}
         <div className="grid gap-3 sm:grid-cols-3">
-          {/* 1. Canva Developer Integration */}
-          <div className="rounded-lg border border-[#7D2AE8]/40 bg-[#7D2AE8]/5 p-3.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#A855F7]">
-                {isAr ? "تطبيق Canva (بوابة المطورين)" : "Canva Developer App"}
-              </span>
-              <span className="flex items-center gap-1 rounded bg-[#7D2AE8]/20 px-2 py-0.5 font-mono text-[11px] text-[#A855F7]">
-                <ShieldCheck className="size-3" />
-                {canvaConfig.configured
-                  ? canvaConfig.connected
-                    ? isAr
-                      ? "محدود (هذه الجلسة فقط)"
-                      : "Limited (this session only)"
-                    : isAr
-                      ? "مُهيأ/لم يُتحقق"
-                      : "Configured, not verified"
-                  : isAr
-                    ? "غير مُهيأ"
-                    : "Not configured"}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {isAr
-                ? canvaConfig.configured
-                  ? "بيانات Canva موجودة. حالة الاتصال لا تعني أن الرفع أو المزامنة السحابية مفعّلان."
-                  : "أضف CANVA_CLIENT_ID وCANVA_CLIENT_SECRET كأسرار للخادم قبل التفويض."
-                : canvaConfig.configured
-                  ? "Canva credentials are configured. This does not enable uploads or cloud sync by itself."
-                  : "Set CANVA_CLIENT_ID and CANVA_CLIENT_SECRET as server secrets before authorizing."}
-            </p>
-            {canvaStatusError && (
-              <p role="status" className="text-xs text-destructive">
-                {isAr
-                  ? "تعذر قراءة حالة Canva من الخادم."
-                  : "Could not read Canva status from the server."}
-              </p>
-            )}
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button
-                type="button"
-                onClick={startCanvaAuth}
-                disabled={!canvaConfig.configured}
-                className="flex items-center gap-1.5 rounded-md bg-[#7D2AE8] px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#6b22c7] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <ExternalLink className="size-3.5" />
-                {isAr ? "تفويض حساب Canva (OAuth)" : "Authorize Canva"}
-              </button>
-              <a
-                href="https://www.canva.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 rounded-md border border-[#7D2AE8]/40 px-2.5 py-1.5 text-xs font-medium text-[#A855F7] hover:bg-[#7D2AE8]/10"
-              >
-                <ExternalLink className="size-3.5" />
-                {isAr ? "فتح Canva الرسمي" : "Open Canva"}
-              </a>
-              <a
-                href="https://www.canva.com/create/social-media/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 rounded-md border border-[#7D2AE8]/40 px-2.5 py-1.5 text-xs font-medium text-[#A855F7] hover:bg-[#7D2AE8]/10"
-              >
-                <ExternalLink className="size-3.5" />
-                {isAr ? "إنشاء تصميم جديد" : "Create Design"}
-              </a>
-              {canvaBrandTemplateId && (
-                <button
-                  onClick={() => copyTemplateId(canvaBrandTemplateId)}
-                  className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-secondary"
-                >
-                  {copiedId === canvaBrandTemplateId ? (
-                    <Check className="size-3 text-accent" />
-                  ) : (
-                    <Copy className="size-3" />
-                  )}
-                  {isAr ? "نسخ معرف القالب" : "Copy ID"}
-                </button>
-              )}
-            </div>
-          </div>
-
+          {/* Provider integrations are shown only when their official staff-backed contracts are connected. */}
           {/* 2. Google Gemini AI Studio */}
           <div className="rounded-lg border border-primary/40 bg-primary/5 p-3.5 space-y-2">
             <div className="flex items-center justify-between">

@@ -1,84 +1,27 @@
-# Coach Ayman's Command Center
+# Coach Cyber Nexus — official product
 
-أريد إنشاء تطبيق مقصورة القيادة الذكية لكابتن أيمن (Coach Ayman Swimming & Relax Fix Hub - Abu Dhabi) كمنصة ويب حديثة فائقة التطور، بتصميم مستقبلي إبداعي (Cyber Command HUD / Dark Glass) يعطي شعور العالم الافتراضي وسهولة التنقل المطلقة، مع الأدوات الآتية:
+`coach-cyber-nexus` is the official, role-aware product. The `command-center-hub` repository is not a UI dependency or runtime API for this app. Only reviewed staff-authenticated backend contracts may be adopted from it.
 
-1. مقصورة القيادة الرئيسية (Cockpit View):
+## Current safety boundary
 
-- شريط علوي ذكي لحالات الاتصال الحية (واتساب، فيسبوك، إنستغرام، تيك توك، وكوتش براين).
-- مركز إشعارات حي لمتابعة كل حركة في النظام.
-- لوحة متابعة فورية للمنشورات وحالاتها الحقيقية (Scheduled, Claimed, Published, Needs Review).
-- حماية صريحة وصفر أزرار وهمية: كل زر يقوم بإجراء حقيقي، ولا نشر تلقائي أو سحب رصيد دون موافقة يدوية.
+The app uses Supabase Auth and verifies an active `staff_profiles` record. Browser configuration is limited to the Supabase URL and publishable/anon key; never put a service-role key or provider secret in a `VITE_*` variable. The retired PIN-based `/api/publish` and in-memory `/api/canva` routes are not part of the official product. Live publishing and outbound messaging are intentionally unavailable during verification. Content approval/scheduling must not be implemented as browser-only state changes.
 
-2. مصنع المحتوى المرن (Content Factory):
-
-- حرية مطلقة للمالك في تحديد مدة خطة النشر (يومي، 3 أيام، أسبوع، أو فوري) دون إجبار على مدة معينة.
-- دعم كامل لمنصات: فيسبوك، إنستغرام، وتيك توك (بفرع مستقل لفيديوهات 9:16).
-- بطاقات مراجعة واضحة مع زر موافقة وجدولة وزر تعديل ذكي.
-
-3. كوتش براين الشامل (Coach Brain):
-
-- مستشار سباحة فني ذكي: يحلل أخطاء التكنيك (حرة، صدر، ظهر، فراشة)، علاج رهبة الماء، والتأهيل الحركي، مع باحث فني لأفضل الأساليب العالمية.
-- المحرك التجاري لأبوظبي: الفروع الأربعة (المشرف، الفلاح، مدينة خليفة، الدانة/النجدة)، وأسعار الحصص (150 و 250 درهماً للحصص الخاصة، و 450 درهماً لمجموعات الأطفال مع خصم الإخوة 400 درهم).
-- مستشار الحملات الإعلانية الممولة: اقتراح أفكار إعلانات لمنصات التواصل وتقدير التكلفة والميزانية.
-
-4. مركز واتساب الذكي (WhatsApp Concierge):
-
-- صندوق رسائل يعرض استفسارات العملاء الواردة.
-- صياغة ردود فورية مقترحة من كوتش براين مع إمكانية تعديلها أو إرسالها بنقرة زر.
-- اعتماد رقم الحجز الرسمي المعتمد (058 821 9130) وفصل رقم الإدارة المخصص للمكالمات فقط (055 137 8660).
-
-5. خزانة الوسائط الحرة (Media Vault):
-
-- إمكانية الرفع المباشر من الهاتف أو الكمبيوتر.
-- خيارات ربط سحابية مرنة غير مقيدة (Google Drive, Google Photos, Dropbox, Canva).
-- إمكانية اختيار محرك الذكاء الاصطناعي المفضل (OpenAI, Gemini, Runway).
-
-الواجهة ثنائية اللغة (عربي / إنجليزي) وسريعة الاستجابة على كل الأجهزة.
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/d5ce83de-4d5c-4f7a-94e8-b5df6a443464).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+Coach Brain now obtains active Academy Knowledge through the staff-authenticated `get_staff_knowledge_management` RPC, with bounded/sanitized context. It fails closed when that protected source is unavailable. The current media and messaging surfaces are not accepted as production-connected until their documented RPC/function contracts, authorization, truthful states, and focused tests are in place. Content writes remain disconnected pending backend contract verification; see [the content RPC audit](docs/CONTENT_RPC_AUDIT.md), [extraction status](docs/EXTRACTION_STATUS.md), [manifest](docs/EXTRACTION_MANIFEST.md), and [product boundary](docs/OFFICIAL_PRODUCT_BOUNDARY.md).
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+npm install
 cp .env.example .env
 npm run dev
 ```
 
-## Deployment
-
-This project is configured to build as a Cloudflare Nitro app and deploy from the generated prebuilt output.
+## Verification
 
 ```sh
-cp .env.example .env
-npm run deploy
+npm run lint
+npm test
+npm run build
 ```
 
-Configure only the integrations you intend to use as Cloudflare Worker secrets/variables before deploying:
-
-- `OWNER_PUBLISH_PIN`
-- `FACEBOOK_PAGE_ACCESS_TOKEN`
-- `INSTAGRAM_ACCESS_TOKEN`
-- `OPENAI_API_KEY` or `GEMINI_API_KEY` / `GOOGLE_API_KEY`
-- `CANVA_CLIENT_ID` and `CANVA_CLIENT_SECRET`
-- `CANVA_REDIRECT_URI` (set to the deployed domain and registered in the Canva developer console)
-
-Publishing and AI integrations stay unavailable until their respective secrets are configured. Canva OAuth currently keeps the exchanged token in worker memory only; it is not durable across worker restarts or isolates.
-
-To deploy an already-built `.output` directory:
-
-```sh
-npx nitro deploy --prebuilt
-```
+Do not deploy or enable external publishing until the capability passes its extraction acceptance gate and an explicit release decision is made.
