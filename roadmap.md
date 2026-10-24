@@ -1,5 +1,8 @@
 # Roadmap
 
+- [x] Reliability audit: distinguish HTTP-success/function-failure envelopes and collect all Gemini answer parts.
+- [ ] Trace reported Facebook→Canva error and Gemini image persistence (blocked: affected source/function and connected backend absent from this checkout).
+
 - [x] Phase 1: Cockpit HUD, bilingual AR/EN, Coach Brain AI chat, business info
 - [x] Cockpit KPIs, quick nav, shortcuts
 - [x] Content Factory (ported from new-coach-: templates, poster studio, review/approve)
