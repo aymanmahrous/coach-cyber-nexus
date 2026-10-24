@@ -6,6 +6,8 @@
  * browser-safe publishable/anon key.
  */
 
+import { isFunctionFailure } from "./integration-responses";
+
 const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
 const SUPABASE_KEY = (
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
@@ -87,7 +89,15 @@ export async function callOfficialFunction<T>(
     cache: "no-store",
     signal,
   });
-  return (await parseResponse(response)) as T;
+  const payload = await parseResponse(response);
+  if (payload === null) {
+    throw new OfficialBackendError("Invalid function response", "INVALID_RESPONSE", response.status);
+  }
+  if (isFunctionFailure(payload)) {
+    // Do not expose arbitrary upstream error bodies or mistake HTTP 200 for success.
+    throw new OfficialBackendError("Function reported a failure; completion was not confirmed", "REQUEST_FAILED", response.status);
+  }
+  return payload as T;
 }
 
 export function officialBackendConfigured(): boolean {

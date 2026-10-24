@@ -1,16 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { withTimeout } from "@/lib/integration-guards";
+import { geminiAnswer } from "@/lib/integration-responses";
 
 const PROVIDER_TIMEOUT_MS = 30_000;
 const GATEWAY_TIMEOUT_MS = 60_000;
-const SUPABASE_URL = (process.env["VITE_SUPABASE_URL"] || "").trim().replace(/\/$/, "");
-const SUPABASE_KEY = (
-  process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
-  process.env["VITE_SUPABASE_ANON_KEY"] ||
-  ""
-).trim();
-const STAFF_TABLE = (process.env["VITE_STAFF_PROFILE_TABLE"] || "staff_profiles").trim();
 
 const SYSTEM = `You are "Coach Brain", the expert AI advisor, head swimming coach, and operating sales engine for Coach Ayman Swimming & Relax Fix Hub in Abu Dhabi.
 Reply in the user's language (Arabic by default, or English if asked). Be concise, practical, authoritative, and structured with markdown.
@@ -48,9 +42,16 @@ const Body = z.object({
 });
 
 async function requireStaffSession(request: Request): Promise<Response | null> {
+  // Runtime secrets must be resolved at request time, not during module evaluation.
+  const SUPABASE_URL = (process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || "").trim().replace(/\/$/, "");
+  const SUPABASE_KEY = (process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || process.env["VITE_SUPABASE_ANON_KEY"] || "").trim();
+  const STAFF_TABLE = (process.env["VITE_STAFF_PROFILE_TABLE"] || "staff_profiles").trim();
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    return new Response("Coach Brain requires staff sign-in setup. Configure the project connection before using AI.", { status: 503 });
+  }
   const authorization = request.headers.get("authorization") || "";
   const accessToken = authorization.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
-  if (!SUPABASE_URL || !SUPABASE_KEY || !accessToken) {
+  if (!accessToken) {
     return new Response("Staff authentication required", { status: 401 });
   }
   const headers = {
@@ -117,7 +118,7 @@ export const Route = createFileRoute("/api/brain")({
             if (!upstream.ok) console.error(`[brain] provider responded status=${upstream.status}`);
             if (upstream.ok) {
               const data = await upstream.json();
-              const reply = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              const reply = geminiAnswer(data);
               if (reply) {
                 return new Response(reply, {
                   headers: { "Content-Type": "text/plain; charset=utf-8" },
