@@ -10,12 +10,14 @@ import {
   ShieldCheck,
   CheckCircle2,
 } from "lucide-react";
+import type { OfficialStaffSession } from "@/lib/official-auth";
 
 type Lang = "ar" | "en";
 
 interface WhatsAppHubProps {
   lang: Lang;
   log: (s: string, tone?: "info" | "ok" | "err") => void;
+  session: OfficialStaffSession;
 }
 
 interface LiveConversation {
@@ -65,7 +67,7 @@ const TEMPLATES = [
   },
 ];
 
-export function WhatsAppHub({ lang, log }: WhatsAppHubProps) {
+export function WhatsAppHub({ lang, log, session }: WhatsAppHubProps) {
   const isAr = lang === "ar";
   const conversations: LiveConversation[] = [];
 
@@ -154,7 +156,10 @@ ${channelContext}
     try {
       const res = await fetch("/api/brain", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.accessToken}`,
+        },
         body: JSON.stringify({ messages: [{ role: "user", content: prompt }] }),
       });
 
