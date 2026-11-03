@@ -39,6 +39,18 @@ import { MediaVault } from "@ws-fazkk1v2rsar4rjz1fjw/d5ce83de-4d5c-4f7a-94e8-b5d
 | `lang` | ar · en | `—` |
 | `log` | function | `—` |
 
+### OfficialAuthError
+
+```ts
+import { OfficialAuthError } from "@ws-fazkk1v2rsar4rjz1fjw/d5ce83de-4d5c-4f7a-94e8-b5df6a443464"
+```
+
+### OfficialBackendError
+
+```ts
+import { OfficialBackendError } from "@ws-fazkk1v2rsar4rjz1fjw/d5ce83de-4d5c-4f7a-94e8-b5df6a443464"
+```
+
 ### WhatsAppHub
 
 ```ts
@@ -51,4 +63,5 @@ import { WhatsAppHub } from "@ws-fazkk1v2rsar4rjz1fjw/d5ce83de-4d5c-4f7a-94e8-b5
 |---|---|---|
 | `lang` | ar · en | `—` |
 | `log` | function | `—` |
+| `session` | any | `—` |
 

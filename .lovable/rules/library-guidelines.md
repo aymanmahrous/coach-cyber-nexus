@@ -4,7 +4,7 @@
 
 The design system exports these components — import them from `@ws-fazkk1v2rsar4rjz1fjw/d5ce83de-4d5c-4f7a-94e8-b5df6a443464` and compose them before building anything from scratch:
 
-`BrandedPosterStudio`, `ContentFactory`, `MediaVault`, `WhatsAppHub`
+`BrandedPosterStudio`, `ContentFactory`, `MediaVault`, `OfficialAuthError`, `OfficialBackendError`, `WhatsAppHub`
 
 Per-component details (import stanzas, props, variants, examples) live in `.lovable/rules/libraries/{slug}/components.md` — on disk, not auto-loaded. Read that file or the component source when the name alone isn't enough.
 
