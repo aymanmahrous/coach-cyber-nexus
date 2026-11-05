@@ -1,12 +1,12 @@
 import { z } from "zod";
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
+const SUPABASE_URL = (import.meta.env["VITE_SUPABASE_URL"] ?? "").trim().replace(/\/$/, "");
 const SUPABASE_KEY = (
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+  import.meta.env["VITE_SUPABASE_ANON_KEY"] ||
   ""
 ).trim();
-const STAFF_TABLE = (import.meta.env.VITE_STAFF_PROFILE_TABLE || "staff_profiles").trim();
+const STAFF_TABLE = (import.meta.env["VITE_STAFF_PROFILE_TABLE"] || "staff_profiles").trim();
 const SESSION_KEY = "official-staff-access-token";
 
 const UserSchema = z.object({ id: z.string().uuid() });
@@ -60,7 +60,7 @@ function publicHeaders(accessToken?: string): HeadersInit {
 async function loadStaffProfile(accessToken: string, userId: string, signal?: AbortSignal) {
   const response = await fetch(
     `${SUPABASE_URL}/rest/v1/${encodeURIComponent(STAFF_TABLE)}?id=eq.${encodeURIComponent(userId)}&select=display_name,role,active&limit=1`,
-    { headers: publicHeaders(accessToken), cache: "no-store", signal },
+    { headers: publicHeaders(accessToken), cache: "no-store", signal: signal ?? null },
   );
   if (response.status === 401) throw new OfficialAuthError("SESSION_EXPIRED");
   if (!response.ok) throw new OfficialAuthError("SERVICE_UNAVAILABLE");
@@ -121,7 +121,7 @@ export async function restoreSession(
   const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
     headers: publicHeaders(accessToken),
     cache: "no-store",
-    signal,
+    signal: signal ?? null,
   });
   if (!response.ok) throw new OfficialAuthError("SESSION_EXPIRED");
   const user = UserSchema.parse(await response.json());

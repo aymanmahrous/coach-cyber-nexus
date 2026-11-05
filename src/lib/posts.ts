@@ -71,11 +71,11 @@ function mapTemplate(value: string | null | undefined): Post["templateType"] {
 function receiptLink(receipts: JsonRecord[] | undefined, platform: string) {
   const receipt = receipts?.find(
     (item) =>
-      String(item.platform ?? "").toLowerCase() === platform.toLowerCase() &&
-      item.status === "published",
+      String(item["platform"] ?? "").toLowerCase() === platform.toLowerCase() &&
+      item["status"] === "published",
   );
   const externalId =
-    typeof receipt?.externalPostId === "string" ? receipt.externalPostId : undefined;
+    typeof receipt?.["externalPostId"] === "string" ? receipt?.["externalPostId"] : undefined;
   if (!externalId) return {};
   if (platform.toLowerCase() === "instagram") {
     return {
@@ -106,7 +106,7 @@ function mapContentItem(value: unknown): Post | null {
         ? { scheduledAt: item.plannedFor }
         : {}),
     createdAt: item.createdAt,
-    templateType: mapTemplate(item.contentType),
+    ...(mapTemplate(item.contentType) ? { templateType: mapTemplate(item.contentType) } : {}),
     ...receiptLink(item.receipts, platform),
   };
 }
