@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { canvaStatus } from "@/lib/integration-guards";
 import {
   ExternalLink,
   FolderOpen,
@@ -66,19 +67,17 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
   const [canvaStatusError, setCanvaStatusError] = useState(false);
   const [canvaConfig, setCanvaConfig] = useState<{
     configured: boolean;
-    clientId: string;
     brandTemplateId: string;
     connected: boolean;
   }>({
     configured: false,
-    clientId: "",
-    brandTemplateId: "EAHVAAahmjU",
+    brandTemplateId: "",
     connected: false,
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef<string[]>([]);
 
-  const canvaBrandTemplateId = canvaConfig.brandTemplateId || "EAHVAAahmjU";
+  const canvaBrandTemplateId = canvaConfig.brandTemplateId;
 
   useEffect(() => {
     let active = true;
@@ -89,7 +88,13 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
       })
       .then((data) => {
         if (data && typeof data.configured === "boolean") {
-          if (active) setCanvaConfig(data);
+          if (active)
+            setCanvaConfig({
+              configured: data.configured,
+              brandTemplateId: typeof data.brandTemplateId === "string" ? data.brandTemplateId : "",
+              // Token lives only in one server instance's memory: limited, not verified.
+              connected: canvaStatus(data) === "limited",
+            });
         } else if (active) {
           setCanvaStatusError(true);
         }
@@ -227,11 +232,11 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
                 {canvaConfig.configured
                   ? canvaConfig.connected
                     ? isAr
-                      ? "متصل"
-                      : "Connected"
+                      ? "محدود (هذه الجلسة فقط)"
+                      : "Limited (this session only)"
                     : isAr
-                      ? "جاهز للربط"
-                      : "Ready to connect"
+                      ? "مُهيأ/لم يُتحقق"
+                      : "Configured, not verified"
                   : isAr
                     ? "غير مُهيأ"
                     : "Not configured"}
@@ -281,17 +286,19 @@ export function MediaVault({ lang, log }: MediaVaultProps) {
                 <ExternalLink className="size-3.5" />
                 {isAr ? "إنشاء تصميم جديد" : "Create Design"}
               </a>
-              <button
-                onClick={() => copyTemplateId(canvaBrandTemplateId)}
-                className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-secondary"
-              >
-                {copiedId === canvaBrandTemplateId ? (
-                  <Check className="size-3 text-accent" />
-                ) : (
-                  <Copy className="size-3" />
-                )}
-                {isAr ? "نسخ معرف القالب" : "Copy ID"}
-              </button>
+              {canvaBrandTemplateId && (
+                <button
+                  onClick={() => copyTemplateId(canvaBrandTemplateId)}
+                  className="flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-secondary"
+                >
+                  {copiedId === canvaBrandTemplateId ? (
+                    <Check className="size-3 text-accent" />
+                  ) : (
+                    <Copy className="size-3" />
+                  )}
+                  {isAr ? "نسخ معرف القالب" : "Copy ID"}
+                </button>
+              )}
             </div>
           </div>
 

@@ -10,3 +10,6 @@
 > the editor, so keep the branch in a working state.
 
 <!-- LOVABLE:END -->
+
+- Validate function-level failure envelopes independently of HTTP status; HTTP 200 alone never proves generation or persistence succeeded.
+- Resolve server authentication configuration inside request handlers; runtime secrets may not exist during module evaluation.
