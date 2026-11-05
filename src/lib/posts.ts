@@ -100,9 +100,11 @@ function mapContentItem(value: unknown): Post | null {
     caption: item.caption,
     visual: item.visualPrompt,
     status: mapStatus(item.status),
-    ...(item.scheduledFor || item.plannedFor
-      ? { scheduledAt: item.scheduledFor ?? item.plannedFor ?? undefined }
-      : {}),
+    ...(item.scheduledFor
+      ? { scheduledAt: item.scheduledFor }
+      : item.plannedFor
+        ? { scheduledAt: item.plannedFor }
+        : {}),
     createdAt: item.createdAt,
     templateType: mapTemplate(item.contentType),
     ...receiptLink(item.receipts, platform),
