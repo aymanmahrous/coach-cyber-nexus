@@ -2,7 +2,7 @@
   "meta": {
     "name": "Coach Ayman's Command Center",
     "package": "@ws-fazkk1v2rsar4rjz1fjw/d5ce83de-4d5c-4f7a-94e8-b5df6a443464",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "framework": "react",
     "css_framework": "tailwind",
     "starter_template": "custom_design_system_tailwind",
@@ -32,6 +32,27 @@
       "public/favicon.ico": "9f504444f85a5af2eef9264b02ae40be",
       "public/robots.txt": "f9dff89adf98833e676de2205921996a",
       "roadmap.md": "4e2601e2750bab11f9339f1e4a8a6a81",
+      "src/assets/fonts/ibm-plex-sans-arabic-400-arabic.woff2": "4fa3d81d41ab028a1572a3df6edc4c70",
+      "src/assets/fonts/ibm-plex-sans-arabic-400-latin-ext.woff2": "8f47bcb71f451f736513957de38bb436",
+      "src/assets/fonts/ibm-plex-sans-arabic-400-latin.woff2": "4767e1197706a58b11c143c694dc8dc3",
+      "src/assets/fonts/ibm-plex-sans-arabic-500-arabic.woff2": "106892212ea759e846ea658d80a09202",
+      "src/assets/fonts/ibm-plex-sans-arabic-500-latin-ext.woff2": "71f4c6840dd1a543268ccef5372f4d17",
+      "src/assets/fonts/ibm-plex-sans-arabic-500-latin.woff2": "80ebc672c9158f9553e57630213c93f5",
+      "src/assets/fonts/ibm-plex-sans-arabic-700-arabic.woff2": "a4390abc98c27c8961d0ef3a0c4ffa20",
+      "src/assets/fonts/ibm-plex-sans-arabic-700-latin-ext.woff2": "8f4b1a9530f155d424aa86b80e1d0468",
+      "src/assets/fonts/ibm-plex-sans-arabic-700-latin.woff2": "8d04403cf5998131c1daa223a0f1397c",
+      "src/assets/fonts/jetbrains-mono-400-latin-ext.woff2": "bd4781a31b4215a1e80868802b3d0e05",
+      "src/assets/fonts/jetbrains-mono-400-latin.woff2": "b636a65da4f00129f08c7df6e5dd75ac",
+      "src/assets/fonts/jetbrains-mono-600-latin-ext.woff2": "bd4781a31b4215a1e80868802b3d0e05",
+      "src/assets/fonts/jetbrains-mono-600-latin.woff2": "b636a65da4f00129f08c7df6e5dd75ac",
+      "src/assets/fonts/orbitron-600-latin.woff2": "5d281085f7277a3ec9c7586dd2f24a13",
+      "src/assets/fonts/orbitron-800-latin.woff2": "5d281085f7277a3ec9c7586dd2f24a13",
+      "src/assets/fonts/space-grotesk-400-latin-ext.woff2": "0bb2ef2eda4ec8a543480fd42836a66d",
+      "src/assets/fonts/space-grotesk-400-latin.woff2": "87c506d88b9f587f0e2292bc271f5083",
+      "src/assets/fonts/space-grotesk-500-latin-ext.woff2": "0bb2ef2eda4ec8a543480fd42836a66d",
+      "src/assets/fonts/space-grotesk-500-latin.woff2": "87c506d88b9f587f0e2292bc271f5083",
+      "src/assets/fonts/space-grotesk-700-latin-ext.woff2": "0bb2ef2eda4ec8a543480fd42836a66d",
+      "src/assets/fonts/space-grotesk-700-latin.woff2": "87c506d88b9f587f0e2292bc271f5083",
       "src/components/BrandedPosterStudio.tsx": "9434a9c045a33ea4dd64118d3eb1578c",
       "src/components/ContentFactory.tsx": "ad4bbceb120e28ddb7992c2552ddcc1f",
       "src/components/MediaVault.tsx": "d52a6edec3e534ab6fe296a562503265",
@@ -83,29 +104,29 @@
       "src/components/ui/toggle.tsx": "ee8c5adac74e7242b85b544db1a8fbad",
       "src/components/ui/tooltip.tsx": "67d71db5a1ab935695d1def497f5b8a6",
       "src/hooks/use-mobile.tsx": "c0a0bdd4638c391a1dd06ac82074e60b",
-      "src/index.ts": "dde7281194337b197984cc29c6c2cc7e",
+      "src/index.ts": "df5d4a8308cb3d28b2a71e9eb2ec128a",
       "src/lib/error-capture.ts": "f630d9686a9a989170f22eff4de7b30d",
       "src/lib/error-page.ts": "8da0ddd7569bac2676b9a5c8edff8a36",
       "src/lib/integration-guards.test.ts": "5b17577006a365e91456769936f9cc7f",
       "src/lib/integration-guards.ts": "802d2153a9ac1f4847e531ab190e8ba3",
-      "src/lib/integration-responses.test.ts": "2f0b2527a9fd6cef3eaed2215ea4ebc0",
-      "src/lib/integration-responses.ts": "d4e7ec5e5feb61e5b7f3b0e9ea25fc56",
+      "src/lib/integration-responses.test.ts": "8f644bbe29a13affc157f74d05656586",
+      "src/lib/integration-responses.ts": "54e106d3003a96b42d434b71c8fcb593",
       "src/lib/lovable-error-reporting.ts": "0367e03b7d71917510e4dc1cdae172ec",
-      "src/lib/official-auth.ts": "b157363161afb657c0e82dfb0ef3b178",
-      "src/lib/official-backend.ts": "f6fde50493778b2d787e1010ab63a539",
-      "src/lib/posts.ts": "85d814481f4be523113dd516f9b412a0",
+      "src/lib/official-auth.ts": "bacc3a86c022fe5f1de97e13412f449c",
+      "src/lib/official-backend.ts": "6f5e660c191df255fcad103ec062e7e3",
+      "src/lib/posts.ts": "514afc7a6c82d7e804b424d58c47554e",
       "src/lib/utils.ts": "d9837f38cc05303254571985e3164050",
       "src/routeTree.gen.ts": "1b2733f28981d99a7cc9eddd9b37f96e",
       "src/router.tsx": "8f905e713b0eba7fa8148b7995a708c9",
       "src/routes/README.md": "0044790c298aeb33868a7525d79f1585",
-      "src/routes/__root.tsx": "25b1309ac5497184cb5491e43b934994",
-      "src/routes/api/brain.ts": "bc489d2637889135cf4838771985e885",
+      "src/routes/__root.tsx": "393db01e95a24c1f18bda24e0980a335",
+      "src/routes/api/brain.ts": "b6f39707c941bc483c2231da4fd9cbb2",
       "src/routes/api/canva.ts": "c7882b23a16389c19e9f3a130762a2d3",
       "src/routes/api/publish.ts": "dbd077943346e200e8f220d5c23e7acb",
       "src/routes/index.tsx": "20dab48dc9d1bd3ce0392fbabd0c6e3e",
       "src/server.ts": "c7bbc49bb70e318af618d92775ee0f27",
       "src/start.ts": "0502f82c58afce5012b4c102e6fe2437",
-      "src/styles.css": "ad9cf5c4b5bebde45186d6462832d66b",
+      "src/styles.css": "4aaab03b9f8704834d1c00fba88c72e6",
       "tsconfig.json": "e84e5c7fe88e3c5a4d54f55a816d42c1",
       "vite.config.ts": "d67e8217e5f31b87c276b6357c9aedcf"
     },
@@ -437,6 +458,113 @@
       "name": "OfficialBackendError",
       "file": "src/lib/official-backend",
       "import_path": ""
+    }
+  ],
+  "assets": [
+    {
+      "file": "src/assets/fonts/ibm-plex-sans-arabic-400-arabic.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/ibm-plex-sans-arabic-400-latin-ext.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/ibm-plex-sans-arabic-400-latin.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/ibm-plex-sans-arabic-500-arabic.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/ibm-plex-sans-arabic-500-latin-ext.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/ibm-plex-sans-arabic-500-latin.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/ibm-plex-sans-arabic-700-arabic.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/ibm-plex-sans-arabic-700-latin-ext.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/ibm-plex-sans-arabic-700-latin.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/jetbrains-mono-400-latin-ext.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/jetbrains-mono-400-latin.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/jetbrains-mono-600-latin-ext.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/jetbrains-mono-600-latin.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/orbitron-600-latin.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/orbitron-800-latin.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/space-grotesk-400-latin-ext.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/space-grotesk-400-latin.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/space-grotesk-500-latin-ext.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/space-grotesk-500-latin.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/space-grotesk-700-latin-ext.woff2",
+      "kind": "font",
+      "format": "woff2"
+    },
+    {
+      "file": "src/assets/fonts/space-grotesk-700-latin.woff2",
+      "kind": "font",
+      "format": "woff2"
     }
   ]
 }
