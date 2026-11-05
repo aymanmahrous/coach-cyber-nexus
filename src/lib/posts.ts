@@ -94,6 +94,7 @@ function mapContentItem(value: unknown): Post | null {
   if (!parsed.success) return null;
   const item = parsed.data;
   const platform = mapPlatform(item.platform);
+  const templateType = mapTemplate(item.contentType);
   return {
     id: item.id,
     platform,
@@ -106,7 +107,7 @@ function mapContentItem(value: unknown): Post | null {
         ? { scheduledAt: item.plannedFor }
         : {}),
     createdAt: item.createdAt,
-    ...(mapTemplate(item.contentType) ? { templateType: mapTemplate(item.contentType) } : {}),
+    ...(templateType ? { templateType } : {}),
     ...receiptLink(item.receipts, platform),
   };
 }

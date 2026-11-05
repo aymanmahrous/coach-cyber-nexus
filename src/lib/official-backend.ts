@@ -91,11 +91,19 @@ export async function callOfficialFunction<T>(
   });
   const payload = await parseResponse(response);
   if (payload === null) {
-    throw new OfficialBackendError("Invalid function response", "INVALID_RESPONSE", response.status);
+    throw new OfficialBackendError(
+      "Invalid function response",
+      "INVALID_RESPONSE",
+      response.status,
+    );
   }
   if (isFunctionFailure(payload)) {
     // Do not expose arbitrary upstream error bodies or mistake HTTP 200 for success.
-    throw new OfficialBackendError("Function reported a failure; completion was not confirmed", "REQUEST_FAILED", response.status);
+    throw new OfficialBackendError(
+      "Function reported a failure; completion was not confirmed",
+      "REQUEST_FAILED",
+      response.status,
+    );
   }
   return payload as T;
 }
