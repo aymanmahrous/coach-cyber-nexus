@@ -43,11 +43,21 @@ const Body = z.object({
 
 async function requireStaffSession(request: Request): Promise<Response | null> {
   // Runtime secrets must be resolved at request time, not during module evaluation.
-  const SUPABASE_URL = (process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || "").trim().replace(/\/$/, "");
-  const SUPABASE_KEY = (process.env["SUPABASE_PUBLISHABLE_KEY"] || process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || process.env["VITE_SUPABASE_ANON_KEY"] || "").trim();
+  const SUPABASE_URL = (process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"] || "")
+    .trim()
+    .replace(/\/$/, "");
+  const SUPABASE_KEY = (
+    process.env["SUPABASE_PUBLISHABLE_KEY"] ||
+    process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+    process.env["VITE_SUPABASE_ANON_KEY"] ||
+    ""
+  ).trim();
   const STAFF_TABLE = (process.env["VITE_STAFF_PROFILE_TABLE"] || "staff_profiles").trim();
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    return new Response("Coach Brain requires staff sign-in setup. Configure the project connection before using AI.", { status: 503 });
+    return new Response(
+      "Coach Brain requires staff sign-in setup. Configure the project connection before using AI.",
+      { status: 503 },
+    );
   }
   const authorization = request.headers.get("authorization") || "";
   const accessToken = authorization.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();

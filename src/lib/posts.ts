@@ -71,11 +71,11 @@ function mapTemplate(value: string | null | undefined): Post["templateType"] {
 function receiptLink(receipts: JsonRecord[] | undefined, platform: string) {
   const receipt = receipts?.find(
     (item) =>
-      String(item.platform ?? "").toLowerCase() === platform.toLowerCase() &&
-      item.status === "published",
+      String(item["platform"] ?? "").toLowerCase() === platform.toLowerCase() &&
+      item["status"] === "published",
   );
   const externalId =
-    typeof receipt?.externalPostId === "string" ? receipt.externalPostId : undefined;
+    typeof receipt?.["externalPostId"] === "string" ? receipt?.["externalPostId"] : undefined;
   if (!externalId) return {};
   if (platform.toLowerCase() === "instagram") {
     return {
@@ -94,17 +94,20 @@ function mapContentItem(value: unknown): Post | null {
   if (!parsed.success) return null;
   const item = parsed.data;
   const platform = mapPlatform(item.platform);
+  const templateType = mapTemplate(item.contentType);
   return {
     id: item.id,
     platform,
     caption: item.caption,
     visual: item.visualPrompt,
     status: mapStatus(item.status),
-    ...(item.scheduledFor || item.plannedFor
-      ? { scheduledAt: item.scheduledFor ?? item.plannedFor ?? undefined }
-      : {}),
+    ...(item.scheduledFor
+      ? { scheduledAt: item.scheduledFor }
+      : item.plannedFor
+        ? { scheduledAt: item.plannedFor }
+        : {}),
     createdAt: item.createdAt,
-    templateType: mapTemplate(item.contentType),
+    ...(templateType ? { templateType } : {}),
     ...receiptLink(item.receipts, platform),
   };
 }

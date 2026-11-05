@@ -8,10 +8,10 @@
 
 import { isFunctionFailure } from "./integration-responses";
 
-const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "");
+const SUPABASE_URL = (import.meta.env["VITE_SUPABASE_URL"] ?? "").trim().replace(/\/$/, "");
 const SUPABASE_KEY = (
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
+  import.meta.env["VITE_SUPABASE_ANON_KEY"] ||
   ""
 ).trim();
 
@@ -71,7 +71,7 @@ export async function callOfficialRpc<T>(
     headers: headers(session),
     body: JSON.stringify(body),
     cache: "no-store",
-    signal,
+    signal: signal ?? null,
   });
   return (await parseResponse(response)) as T;
 }
@@ -87,15 +87,23 @@ export async function callOfficialFunction<T>(
     headers: headers(session),
     body: JSON.stringify(body),
     cache: "no-store",
-    signal,
+    signal: signal ?? null,
   });
   const payload = await parseResponse(response);
   if (payload === null) {
-    throw new OfficialBackendError("Invalid function response", "INVALID_RESPONSE", response.status);
+    throw new OfficialBackendError(
+      "Invalid function response",
+      "INVALID_RESPONSE",
+      response.status,
+    );
   }
   if (isFunctionFailure(payload)) {
     // Do not expose arbitrary upstream error bodies or mistake HTTP 200 for success.
-    throw new OfficialBackendError("Function reported a failure; completion was not confirmed", "REQUEST_FAILED", response.status);
+    throw new OfficialBackendError(
+      "Function reported a failure; completion was not confirmed",
+      "REQUEST_FAILED",
+      response.status,
+    );
   }
   return payload as T;
 }
